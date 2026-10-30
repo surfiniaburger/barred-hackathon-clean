@@ -13,7 +13,7 @@
 2. **Mathematical Receipt Validator (`scenarios/debate/counter_evidence_validation.py`):** Verifies invariant contracts to eliminate AI safety hallucinations and false positives (achieving `0.0%` accepted logic error rate across all benchmarks).
 3. **Meta Muse-Glimmer-30B Integration:** End-to-end multi-agent debate, adjudication, and candidate selection powered by Meta's open-weights model via Uzu.
 4. **Fault-Tolerant 3-Way Adjudication Contracts:** `PASS` (Proven via C1) | `BLOCKED` (Falsified/Exploitable) | `UNRESOLVED` (Explicit abstention on unsupported domains).
-5. **Architectural Bug Fixes & False-Positive Elimination:** Hardened through 38 regression and replay tests closing null-receipt false passes, non-dominating guard hallucinations, schema coercion failures, and ungrounded wrapper claims.
+5. **Architectural Bug Fixes & False-Positive Elimination:** Hardened through 16 regression tests closing null-receipt false passes, non-dominating guard hallucinations, schema coercion failures, and ungrounded wrapper claims.
 6. **One-Command Reviewer CLI & Evidence Pack:** A developer-facing tool allowing instant 30-second inspection or full live verification.
 
 ---
@@ -138,25 +138,25 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 
 ## Verification, Test Suite & Bug Fixes
 
-### 🧪 38 TDD & Regression Tests (Passing in 1.4s)
-All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 38-test offline suite:
+### 🧪 16 TDD & Regression Tests (Passing in 1.4s)
+All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 16-test offline suite:
 ```bash
 uv run pytest tests/test_con_receipt_extractor.py tests/test_counter_evidence_fixtures.py -v
 ```
 
 ### 🛡️ Bug Fixes & False-Positive Elimination
-In baseline unconstrained multi-agent debate runs, models routinely suffered from critical false positives and hallucinated defenses. The 38 tests explicitly encode and guard against these historical failure modes:
+In baseline unconstrained multi-agent debate runs, models routinely suffered from critical false positives and hallucinated defenses. The 16 tests explicitly encode and guard against these historical failure modes:
 
-1. **Elimination of Null-Receipt False Passes (`test_failure_modes_replay.py`)**:
+1. **Elimination of Null-Receipt False Passes** (covered by `test_counter_evidence_fixtures.py`):
    - *Previous Defect:* LLM judges previously awarded defense wins (`winner="con_debater"`) based solely on plausible-sounding rhetoric without machine-verifiable receipts, causing catastrophic false positives on vulnerable code.
    - *Fix:* Con wins without deterministically confirmed receipts safely downgrade to controlled epistemic refusal (`outcome="unresolved"`).
 2. **Rejection of Incompatible and Non-Dominating Guards (`test_counter_evidence_fixtures.py`)**:
    - *Previous Defect:* Models claimed safety when a bounds check occurred *after* the vulnerable memory operation (`memcpy`), or checked unrelated variables (e.g., checking `cap > len` or checking `size` while copying `len`).
    - *Fix:* The AST validator strictly enforces control-flow dominance (guard must precede and dominate sink) and variable-binding equality (`guarded_value_equals_operation_value`).
-3. **Semantic Validation Gap for Unknown Sinks (`test_con_receipt_e2e.py`)**:
+3. **Semantic Validation Gap for Unknown Sinks** (covered by `test_con_receipt_extractor.py`):
    - *Previous Defect:* Superficial guards on 3rd-party library calls (e.g. `gdImageJpegPtr` in Seed 90) were erroneously claimed as bounded safety proofs.
    - *Fix:* Non-standard memory sinks without formal trusted operation summaries are flagged (`operation_not_recognized_sink`) and rejected (`counter_evidence_unrecognized_operation`), forcing honest abstention (`UNRESOLVED`).
-4. **Resilient Schema Coercion & Parse Recovery (`test_debate_eval_schema.py`)**:
+4. **Resilient Schema Coercion & Parse Recovery** (covered by `test_con_receipt_extractor.py`):
    - *Previous Defect:* Live LLM variations outputting `verdict_reason` instead of `reason`, formatting `thinking_process` as a JSON array, or omitting scorecard sub-dictionaries caused unhandled crashes.
    - *Fix:* Robust Pydantic before-validators and repair context coercion automatically harmonize variations without compromising validation rigor.
 5. **Early Deterministic Halting & Multi-Turn Reflection**:
