@@ -13,7 +13,7 @@
 2. **Mathematical Receipt Validator (`scenarios/debate/counter_evidence_validation.py`):** Verifies invariant contracts to eliminate AI safety hallucinations and false positives (achieving `0.0%` accepted logic error rate across all benchmarks).
 3. **Meta Muse-Glimmer-30B Integration:** End-to-end multi-agent debate, adjudication, and candidate selection powered by Meta's open-weights model via Uzu.
 4. **Fault-Tolerant 3-Way Adjudication Contracts:** `PASS` (Proven via C1) | `BLOCKED` (Falsified/Exploitable) | `UNRESOLVED` (Explicit abstention on unsupported domains).
-5. **Architectural Bug Fixes & False-Positive Elimination:** Hardened through 16 regression tests closing null-receipt false passes, non-dominating guard hallucinations, schema coercion failures, and ungrounded wrapper claims.
+5. **Architectural Bug Fixes & False-Positive Elimination:** Hardened through 40 regression tests closing null-receipt false passes, non-dominating guard hallucinations, schema coercion failures, and ungrounded wrapper claims.
 6. **One-Command Reviewer CLI & Evidence Pack:** A developer-facing tool allowing instant 30-second inspection or full live verification.
 
 ---
@@ -138,14 +138,23 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 
 ## Verification, Test Suite & Bug Fixes
 
-### 🧪 16 TDD & Regression Tests (Passing in 1.4s)
-All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 16-test offline suite:
+### 🧪 40 TDD & Regression Tests (Passing in 1.4s)
+All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 40-test offline suite:
 ```bash
+# Standalone (no foundation needed):
 uv run pytest tests/test_con_receipt_extractor.py tests/test_counter_evidence_fixtures.py -v
+
+# Full suite (after bootstrap.sh):
+cd foundation && uv run pytest \
+  tests/test_con_receipt_e2e.py \
+  tests/test_con_receipt_extractor.py \
+  tests/test_counter_evidence_fixtures.py \
+  tests/test_debate_eval_schema.py \
+  tests/test_failure_modes_replay.py -v
 ```
 
 ### 🛡️ Bug Fixes & False-Positive Elimination
-In baseline unconstrained multi-agent debate runs, models routinely suffered from critical false positives and hallucinated defenses. The 16 tests explicitly encode and guard against these historical failure modes:
+In baseline unconstrained multi-agent debate runs, models routinely suffered from critical false positives and hallucinated defenses. The 40 tests explicitly encode and guard against these historical failure modes:
 
 1. **Elimination of Null-Receipt False Passes** (covered by `test_counter_evidence_fixtures.py`):
    - *Previous Defect:* LLM judges previously awarded defense wins (`winner="con_debater"`) based solely on plausible-sounding rhetoric without machine-verifiable receipts, causing catastrophic false positives on vulnerable code.

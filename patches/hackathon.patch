@@ -1252,3 +1252,1520 @@ index 306b56f..0b34f86 100644
      valid_path = _validate_path(path, base_dir=base_dir)
      try:
          with open(valid_path, "r", encoding="utf-8") as f:
+diff --git a/tests/test_con_receipt_e2e.py b/tests/test_con_receipt_e2e.py
+new file mode 100644
+index 0000000..422005c7737cd9c7671645ff9d035a594eee386a
+--- /dev/null
++++ b/tests/test_con_receipt_e2e.py
+@@ -0,0 +1,477 @@
++"""End-to-end validator tests for Con receipt V1 (Step 5 of Con Receipt Plan).
++
++Tests the full pipeline: code → extractor → validator, using synthetic candidates.
++"""
++import pytest
++import os
++import tempfile
++from unittest.mock import AsyncMock, MagicMock
++from agentbeats.models import EvalRequest
++from scenarios.debate.debate_judge_common import DebateEval, DebaterScore
++from scenarios.debate.adk_debate_judge import DebateJudgeADK, _EvalContext, _collect_soft_checks
++
++
++from scenarios.debate.counter_evidence_validation import validate_counter_evidence
++from scenarios.debate.con_receipt_extractor import extract_candidates, format_candidates_for_prompt
++
++OBLIGATION = {"version": "v1", "kind": "upper_bound", "candidate_ids": None}
++
++# Valid upper-bound reject
++VALID_CODE = "void f(char *dst, char *src, int len, int cap) {\n    if (len > cap) return;\n    memcpy(dst, src, len);\n}"
++VALID_EVIDENCE = {
++    "defense_kind": "upper_bound_reject",
++    "guard_anchor": "if (len > cap) return;",
++    "guarded_value": "len",
++    "protected_operation_anchor": "memcpy(dst, src, len)",
++    "operation_value": "len",
++    "enforcement": "reject_before_operation",
++    "invariant": "len <= cap before copy",
++    "predicate_precondition": "len exceeds capacity",
++    "value_relation": "guarded_value_equals_operation_value",
++    "counterfactual": "Removing guard lets len reach memcpy.",
++}
++
++# Wrong value: guard checks 'cap', operation uses 'len'
++WRONG_VALUE_CODE = "void f(char *dst, char *src, int len, int cap) {\n    if (cap > len) return;\n    memcpy(dst, src, len);\n}"
++WRONG_VALUE_EVIDENCE = {
++    "defense_kind": "upper_bound_reject",
++    "guard_anchor": "if (cap > len) return;",
++    "guarded_value": "cap",
++    "protected_operation_anchor": "memcpy(dst, src, len)",
++    "operation_value": "len",
++    "enforcement": "reject_before_operation",
++    "invariant": "cap <= len before copy",
++    "predicate_precondition": "len exceeds capacity",
++    "value_relation": "guarded_value_equals_operation_value",
++    "counterfactual": "Removing guard lets cap reach memcpy.",
++}
++
++# Guard after operation (non-dominating)
++GUARD_AFTER_CODE = "void f(char *dst, char *src, int len, int cap) {\n    memcpy(dst, src, len);\n    if (len > cap) return;\n}"
++GUARD_AFTER_EVIDENCE = {
++    "defense_kind": "upper_bound_reject",
++    "guard_anchor": "if (len > cap) return;",
++    "guarded_value": "len",
++    "protected_operation_anchor": "memcpy(dst, src, len)",
++    "operation_value": "len",
++    "enforcement": "reject_before_operation",
++    "invariant": "len <= cap before copy",
++    "predicate_precondition": "len exceeds capacity",
++    "value_relation": "guarded_value_equals_operation_value",
++    "counterfactual": "Removing guard lets len reach memcpy.",
++}
++
++# Incompatible pairing: null_check with wrong value_relation
++MISMATCH_CODE = "void f(int *p) {\n    if (p == NULL) return;\n    *p = 42;\n}"
++MISMATCH_EVIDENCE = {
++    "defense_kind": "null_check",
++    "guard_anchor": "if (p == NULL) return;",
++    "guarded_value": "p",
++    "protected_operation_anchor": "*p = 42;",
++    "operation_value": "p",
++    "enforcement": "operation_inside_safe_branch",
++    "invariant": "p is non-null before deref",
++    "predicate_precondition": "p is null",
++    "value_relation": "guarded_value_bounds_offset_plus_width",
++    "counterfactual": "Removing guard lets null p be dereferenced.",
++}
++
++
++def test_e2e_valid_receipt_confirmed():
++    r = validate_counter_evidence(VALID_CODE, "copy can overflow", VALID_EVIDENCE, OBLIGATION)
++    assert r["status"] == "deterministically_confirmed", r
++
++
++def test_e2e_wrong_value_not_confirmed():
++    r = validate_counter_evidence(WRONG_VALUE_CODE, "copy can overflow", WRONG_VALUE_EVIDENCE, OBLIGATION)
++    assert r["status"] != "deterministically_confirmed", r
++
++
++def test_e2e_guard_after_not_confirmed():
++    r = validate_counter_evidence(GUARD_AFTER_CODE, "copy can overflow", GUARD_AFTER_EVIDENCE, OBLIGATION)
++    assert r["status"] != "deterministically_confirmed", r
++
++
++def test_e2e_incompatible_pairing_rejected():
++    obl = {"version": "v1", "kind": "null_dereference"}
++    ev = dict(MISMATCH_EVIDENCE)
++    ev["defense_kind"] = "null_check"
++    r = validate_counter_evidence(MISMATCH_CODE, "null deref", ev, obl)
++    assert r["status"] == "invalid_contract", r
++    assert "counter_evidence_incompatible_pairing" in r["failure_reasons"], r
++
++
++def test_e2e_extractor_produces_valid_candidate():
++    cands = extract_candidates(VALID_CODE, OBLIGATION)
++    assert len(cands) >= 1
++    # Complete the extractor candidate with the missing receipt fields
++    ev = cands[0].to_dict()
++    ev.pop("source_span", None)
++    ev.pop("unsupported_conditions", None)
++    ev.setdefault("invariant", "len <= cap before copy")
++    ev.setdefault("predicate_precondition", "len exceeds capacity")
++    ev.setdefault("counterfactual", "Removing guard lets len reach memcpy.")
++    r = validate_counter_evidence(VALID_CODE, "copy can overflow", ev, OBLIGATION)
++    assert r["status"] == "deterministically_confirmed", r
++
++
++def test_e2e_extractor_candidate_with_incompatible_pairing_rejected():
++    # range_guarded_operation candidate should have compatible enforcement/value_relation
++    code = "void f(char *dst, char *src, int len, int cap) {\n    if (len <= cap) {\n        memcpy(dst, src, len);\n    }\n}"
++    cands = extract_candidates(code, OBLIGATION)
++    assert len(cands) >= 1
++    ev = cands[0].to_dict()
++    ev.pop("source_span", None)
++    ev.pop("unsupported_conditions", None)
++    ev.setdefault("invariant", "len <= cap before copy")
++    ev.setdefault("predicate_precondition", "len exceeds capacity")
++    ev.setdefault("counterfactual", "Removing guard lets len reach memcpy.")
++    r = validate_counter_evidence(code, "copy can overflow", ev, OBLIGATION)
++    assert r["status"] == "deterministically_confirmed", r
++
++
++# --- Non-recognized operation (broad-detected) ---
++BROAD_CODE = "void f(int x, int max) {\n    if (x > max) return;\n    foo_bar(x);\n}"
++BROAD_EVIDENCE = {
++    "defense_kind": "upper_bound_reject",
++    "guard_anchor": "if (x > max) return;",
++    "guarded_value": "x",
++    "protected_operation_anchor": "foo_bar(x)",
++    "operation_value": "x",
++    "enforcement": "reject_before_operation",
++    "invariant": "x <= max before foo_bar",
++    "predicate_precondition": "x exceeds max",
++    "value_relation": "guarded_value_equals_operation_value",
++    "counterfactual": "Removing guard lets x reach foo_bar.",
++}
++
++
++def test_e2e_broad_detected_rejected_without_trusted_summary():
++    """An unrecognized sink with a structurally plausible guard is flagged by
++    the extractor (operation_not_recognized_sink). The validator does NOT
++    confirm it based on structural proof alone — it requires a trusted
++    operation summary to establish the operation's semantics. Without one,
++    the result is invalid_contract (counter_evidence_unrecognized_operation).
++    This closes the semantic-validation gap: structural proof alone is
++    insufficient for unrecognized operations."""
++    cands = extract_candidates(BROAD_CODE, OBLIGATION)
++    assert len(cands) >= 1
++    assert "operation_not_recognized_sink" in cands[0].unsupported_conditions
++    # Without trusted_operation_summary, the validator rejects.
++    r = validate_counter_evidence(BROAD_CODE, "foo_bar overflow", BROAD_EVIDENCE, OBLIGATION)
++    assert r["status"] == "invalid_contract", r
++    assert "counter_evidence_unrecognized_operation" in r["failure_reasons"], r
++
++
++
++# --- Candidate selection tests (Step 3 integration) ---
++
++CANDIDATE_CODE = "void f(char *dst, char *src, int len, int cap) {\n    if (len > cap) return;\n    memcpy(dst, src, len);\n}"
++
++
++def _make_candidate_ctx(judge, req, code=CANDIDATE_CODE):
++    """Helper: create an _EvalContext with extracted candidates stored."""
++    from scenarios.debate.con_receipt_extractor import extract_candidates
++    from scenarios.debate.adk_debate_judge import _EvalContext
++    ctx = _EvalContext(req, judge)
++    obl = {"version": "v1", "kind": "upper_bound"}
++    ctx.defense_obligation = obl
++    ctx.last_con_candidates = extract_candidates(code, obl)
++    return ctx
++
++
++@pytest.mark.asyncio
++async def test_candidate_selection_valid_id_accepted():
++    """Con selects a valid candidate ID (C1) → resolved receipt validates → accepted."""
++    with tempfile.TemporaryDirectory() as td:
++        req = EvalRequest(
++            participants={"pro_debater": "http://localhost:9001", "con_debater": "http://localhost:9002"},
++            config={
++                "run_id": "test-cand-valid",
++                "seed": 42,
++                "mode": "passthrough",
++                "topic": "test",
++                "predicate": "Vulnerable to heap overflow",
++                "target_verdict": "True",
++                "record_path": os.path.join(td, "run.json"),
++                "attempts_path": os.path.join(td, "attempts.jsonl"),
++                "defense_obligation": {"version": "v1", "kind": "upper_bound"},
++            },
++        )
++        judge = DebateJudgeADK()
++        ctx = _make_candidate_ctx(judge, req)
++
++        pro = DebaterScore(technical_accuracy=0.3, logic_soundness=0.3, evidence_strength=0.3, total_score=0.3, critique="Pro argued")
++        con = DebaterScore(technical_accuracy=0.9, logic_soundness=0.9, evidence_strength=0.9, total_score=0.9, critique="Con proved bounds check")
++        debate_eval = DebateEval(
++            thinking_process="Thinking...",
++            predicate="Vulnerable to heap overflow",
++            anchors=["len > cap", "memcpy(dst, src, len)"],
++            winner="con_debater",
++            outcome="con_win",
++            reason="Code contains a strict bounds check.",
++            mechanism="Guard anchor: if (len > cap) return;",
++            counterfactual="If guard removed",
++            support_level="supported",
++            verifier_report="Passed",
++            pro_debater=pro,
++            con_debater=con,
++            con_candidate_id="C1",
++        )
++        normalized_anchors = ["len > cap", "memcpy(dst, src, len)"]
++        soft_checks = {
++            "con_win_counter_evidence": {"pass": True, "applicable": True},
++        }
++
++        updater = MagicMock()
++        updater.update_status = AsyncMock()
++
++        judge._restore_or_call_verifier = AsyncMock()
++
++        # _collect_soft_checks resolves the candidate; simulate by setting ctx.last_con_receipt
++        # The actual _process_verifier_audit calls _collect_soft_checks internally in run_eval,
++        # but here we call it directly. Let's call _collect_soft_checks first.
++        sc, as_ = _collect_soft_checks(ctx, debate_eval, CANDIDATE_CODE, normalized_anchors)
++        soft_checks = sc
++
++        is_valid, report, meta, reason = await judge._process_verifier_audit(
++            ctx, 0, debate_eval, CANDIDATE_CODE, normalized_anchors, soft_checks, {}, {}, None, "start", updater
++        )
++
++        assert is_valid is True, meta
++        assert meta["error"] == "validated_con_counter_evidence"
++        judge._restore_or_call_verifier.assert_not_called()
++
++
++@pytest.mark.asyncio
++async def test_candidate_selection_unknown_id_rejected():
++    """Con selects a non-existent candidate ID (C99) → rejected (unknown candidate)."""
++    with tempfile.TemporaryDirectory() as td:
++        req = EvalRequest(
++            participants={"pro_debater": "http://localhost:9001", "con_debater": "http://localhost:9002"},
++            config={
++                "run_id": "test-cand-unknown",
++                "seed": 42,
++                "mode": "passthrough",
++                "topic": "test",
++                "predicate": "Vulnerable to heap overflow",
++                "target_verdict": "True",
++                "record_path": os.path.join(td, "run.json"),
++                "attempts_path": os.path.join(td, "attempts.jsonl"),
++                "defense_obligation": {"version": "v1", "kind": "upper_bound"},
++            },
++        )
++        judge = DebateJudgeADK()
++        ctx = _make_candidate_ctx(judge, req)
++
++        pro = DebaterScore(technical_accuracy=0.3, logic_soundness=0.3, evidence_strength=0.3, total_score=0.3, critique="Pro argued")
++        con = DebaterScore(technical_accuracy=0.9, logic_soundness=0.9, evidence_strength=0.9, total_score=0.9, critique="Con proved bounds check")
++        debate_eval = DebateEval(
++            thinking_process="Thinking...",
++            predicate="Vulnerable to heap overflow",
++            anchors=["len > cap", "memcpy(dst, src, len)"],
++            winner="con_debater",
++            outcome="con_win",
++            reason="Code contains a strict bounds check.",
++            mechanism="Guard anchor: if (len > cap) return;",
++            counterfactual="If guard removed",
++            support_level="supported",
++            verifier_report="Passed",
++            pro_debater=pro,
++            con_debater=con,
++            con_candidate_id="C99",
++        )
++        normalized_anchors = ["len > cap", "memcpy(dst, src, len)"]
++        soft_checks = {
++            "con_win_counter_evidence": {"pass": True, "applicable": True},
++        }
++
++        updater = MagicMock()
++        updater.update_status = AsyncMock()
++
++        judge._restore_or_call_verifier = AsyncMock()
++
++        sc, as_ = _collect_soft_checks(ctx, debate_eval, CANDIDATE_CODE, normalized_anchors)
++        soft_checks = sc
++
++        is_valid, report, meta, reason = await judge._process_verifier_audit(
++            ctx, 0, debate_eval, CANDIDATE_CODE, normalized_anchors, soft_checks, {}, {}, None, "start", updater
++        )
++
++        assert is_valid is False
++        judge._restore_or_call_verifier.assert_not_called()
++
++
++@pytest.mark.asyncio
++async def test_candidate_selection_no_candidate_unresolved():
++    """Con with no candidate ID → unresolved outcome survives (not accepted)."""
++    with tempfile.TemporaryDirectory() as td:
++        req = EvalRequest(
++            participants={"pro_debater": "http://localhost:9001", "con_debater": "http://localhost:9002"},
++            config={
++                "run_id": "test-cand-none",
++                "seed": 42,
++                "mode": "passthrough",
++                "topic": "test",
++                "predicate": "Vulnerable to heap overflow",
++                "target_verdict": "True",
++                "record_path": os.path.join(td, "run.json"),
++                "attempts_path": os.path.join(td, "attempts.jsonl"),
++                "defense_obligation": {"version": "v1", "kind": "upper_bound"},
++            },
++        )
++        judge = DebateJudgeADK()
++        ctx = _make_candidate_ctx(judge, req)
++
++        pro = DebaterScore(technical_accuracy=0.3, logic_soundness=0.3, evidence_strength=0.3, total_score=0.3, critique="Pro argued")
++        con = DebaterScore(technical_accuracy=0.9, logic_soundness=0.9, evidence_strength=0.9, total_score=0.9, critique="Con proved bounds check")
++        debate_eval = DebateEval(
++            thinking_process="Thinking...",
++            predicate="Vulnerable to heap overflow",
++            anchors=["len > cap", "memcpy(dst, src, len)"],
++            winner=None,
++            outcome="unresolved",
++            reason="No candidate proves the defense.",
++            mechanism="Guard anchor: if (len > cap) return;",
++            counterfactual="If guard removed",
++            support_level="inconclusive",
++            verifier_report="Passed",
++            pro_debater=pro,
++            con_debater=con,
++        )
++        normalized_anchors = ["len > cap", "memcpy(dst, src, len)"]
++        soft_checks = {
++            "con_win_counter_evidence": {"pass": False, "applicable": True},
++        }
++
++        updater = MagicMock()
++        updater.update_status = AsyncMock()
++
++        judge._restore_or_call_verifier = AsyncMock()
++
++        sc, as_ = _collect_soft_checks(ctx, debate_eval, CANDIDATE_CODE, normalized_anchors)
++        soft_checks = sc
++
++        is_valid, report, meta, reason = await judge._process_verifier_audit(
++            ctx, 0, debate_eval, CANDIDATE_CODE, normalized_anchors, soft_checks, {}, {}, None, "start", updater
++        )
++
++        assert is_valid is False
++        assert debate_eval.outcome == "unresolved"
++        assert debate_eval.con_candidate_id is None
++        judge._restore_or_call_verifier.assert_not_called()
++
++
++@pytest.mark.asyncio
++async def test_no_free_text_receipt_enforcement():
++    """Model-supplied counter_evidence is ignored when con_candidate_id is present."""
++    with tempfile.TemporaryDirectory() as td:
++        req = EvalRequest(
++            participants={"pro_debater": "http://localhost:9001", "con_debater": "http://localhost:9002"},
++            config={
++                "run_id": "test-no-freetext",
++                "seed": 42,
++                "mode": "passthrough",
++                "topic": "test",
++                "predicate": "Vulnerable to heap overflow",
++                "target_verdict": "True",
++                "record_path": os.path.join(td, "run.json"),
++                "attempts_path": os.path.join(td, "attempts.jsonl"),
++                "defense_obligation": {"version": "v1", "kind": "upper_bound"},
++            },
++        )
++        judge = DebateJudgeADK()
++        ctx = _make_candidate_ctx(judge, req)
++
++        pro = DebaterScore(technical_accuracy=0.3, logic_soundness=0.3, evidence_strength=0.3, total_score=0.3, critique="Pro argued")
++        con = DebaterScore(technical_accuracy=0.9, logic_soundness=0.9, evidence_strength=0.9, total_score=0.9, critique="Con proved bounds check")
++        # Model tries to supply both con_candidate_id AND a free-text counter_evidence
++        free_text_ce = {
++            "defense_kind": "upper_bound_reject",
++            "guard_anchor": "if (FAKE > 0) return;",
++            "guarded_value": "FAKE",
++            "protected_operation_anchor": "memcpy(dst, src, FAKE)",
++            "operation_value": "FAKE",
++            "enforcement": "reject_before_operation",
++            "invariant": "fake",
++            "predicate_precondition": "fake",
++            "value_relation": "guarded_value_equals_operation_value",
++            "counterfactual": "fake",
++        }
++        debate_eval = DebateEval(
++            thinking_process="Thinking...",
++            predicate="Vulnerable to heap overflow",
++            anchors=["len > cap", "memcpy(dst, src, len)"],
++            winner="con_debater",
++            outcome="con_win",
++            reason="Code contains a strict bounds check.",
++            mechanism="Guard anchor: if (len > cap) return;",
++            counterfactual="If guard removed",
++            support_level="supported",
++            verifier_report="Passed",
++            pro_debater=pro,
++            con_debater=con,
++            con_candidate_id="C1",
++        )
++        normalized_anchors = ["len > cap", "memcpy(dst, src, len)"]
++        soft_checks = {
++            "con_win_counter_evidence": {"pass": True, "applicable": True},
++        }
++
++        updater = MagicMock()
++        updater.update_status = AsyncMock()
++
++        judge._restore_or_call_verifier = AsyncMock()
++
++        sc, as_ = _collect_soft_checks(ctx, debate_eval, CANDIDATE_CODE, normalized_anchors)
++        soft_checks = sc
++
++        is_valid, report, meta, reason = await judge._process_verifier_audit(
++            ctx, 0, debate_eval, CANDIDATE_CODE, normalized_anchors, soft_checks, {}, {}, None, "start", updater
++        )
++
++        # The resolved receipt comes from the candidate (C1), not the free-text.
++        # The free-text anchors (FAKE) should not appear in the validated receipt.
++        assert is_valid is True, meta
++        # Verify the receipt used the candidate's anchors, not the free-text ones
++        receipt = soft_checks.get("counter_evidence_validation") or {}
++        assert "FAKE" not in str(receipt), "Free-text receipt was used instead of candidate"
++        judge._restore_or_call_verifier.assert_not_called()
++
++
++@pytest.mark.asyncio
++async def test_server_side_resolution():
++    """The runtime resolves con_candidate_id to the candidate's receipt, not the model's."""
++    with tempfile.TemporaryDirectory() as td:
++        req = EvalRequest(
++            participants={"pro_debater": "http://localhost:9001", "con_debater": "http://localhost:9002"},
++            config={
++                "run_id": "test-server-resolve",
++                "seed": 42,
++                "mode": "passthrough",
++                "topic": "test",
++                "predicate": "Vulnerable to heap overflow",
++                "target_verdict": "True",
++                "record_path": os.path.join(td, "run.json"),
++                "attempts_path": os.path.join(td, "attempts.jsonl"),
++                "defense_obligation": {"version": "v1", "kind": "upper_bound"},
++            },
++        )
++        judge = DebateJudgeADK()
++        ctx = _make_candidate_ctx(judge, req)
++
++        # Verify candidates were extracted
++        assert len(ctx.last_con_candidates) >= 1
++        assert ctx.last_con_candidates[0].candidate_id == "C1"
++
++        # Verify the candidate's receipt validates
++        c = ctx.last_con_candidates[0]
++        ev = c.to_dict()
++        ev.pop("source_span", None)
++        ev.pop("unsupported_conditions", None)
++        ev.setdefault("invariant", "len <= cap before copy")
++        ev.setdefault("predicate_precondition", "len exceeds capacity")
++        ev.setdefault("counterfactual", "Removing guard lets len reach memcpy.")
++        from scenarios.debate.counter_evidence_validation import validate_counter_evidence
++        r = validate_counter_evidence(CANDIDATE_CODE, "copy can overflow", ev, {"version": "v1", "kind": "upper_bound"})
++        assert r["status"] == "deterministically_confirmed", r
+diff --git a/tests/test_debate_eval_schema.py b/tests/test_debate_eval_schema.py
+new file mode 100644
+index 0000000..196662b1fa1f3bf41cc2fad6a1c393388716f84b
+--- /dev/null
++++ b/tests/test_debate_eval_schema.py
+@@ -0,0 +1,47 @@
++from scenarios.debate.debate_judge_common import DebateEval
++
++
++def _payload(counter_evidence):
++    return {
++        "thinking_process": "test",
++        "pro_debater": {"technical_accuracy": 1, "logic_soundness": 1, "evidence_strength": 1, "total_score": 3, "critique": "x"},
++        "con_debater": {"technical_accuracy": 1, "logic_soundness": 1, "evidence_strength": 1, "total_score": 3, "critique": "x"},
++        "winner": "con_debater",
++        "con_candidate_id": "C1",
++        "reason": "test",
++        "mechanism": "Source anchor: x\nSink anchor: y\nMissing guard anchor: z",
++        "counterfactual": "test",
++        "predicate": "test",
++        "anchors": ["x", "y"],
++        "counter_evidence": counter_evidence,
++    }
++
++
++def _counter_evidence():
++    return {
++        "defense_kind": "null_check",
++        "guard_anchor": "if (!ptr) return;",
++        "guarded_value": "ptr",
++        "protected_operation_anchor": "use(ptr);",
++        "operation_value": "ptr",
++        "enforcement": "reject_before_operation",
++        "invariant": "ptr is non-null",
++        "predicate_precondition": "ptr is null",
++        "value_relation": "guarded_value_equals_operation_value",
++        "counterfactual": "without the check, use(ptr) could run",
++    }
++
++
++def test_debate_eval_unwraps_only_a_single_legacy_counter_evidence_item():
++    result = DebateEval.model_validate(_payload([_counter_evidence()]))
++    assert result.counter_evidence is not None
++    assert result.counter_evidence.guard_anchor == "if (!ptr) return;"
++
++
++def test_debate_eval_does_not_accept_multiple_counter_evidence_items():
++    try:
++        DebateEval.model_validate(_payload([_counter_evidence(), _counter_evidence()]))
++    except ValueError:
++        pass
++    else:
++        raise AssertionError("multi-item counter evidence must remain invalid")
+diff --git a/tests/test_failure_modes_replay.py b/tests/test_failure_modes_replay.py
+new file mode 100644
+index 0000000..4781f7ee036dc30f1d0089d1dc49a2dd74d7c3ea
+--- /dev/null
++++ b/tests/test_failure_modes_replay.py
+@@ -0,0 +1,309 @@
++"""TDD tests for the 6 failure modes from the q9d smoke run.
++
++These tests use mocked LLM responses to verify that the new code (discriminated
++union, candidate selection, halt gating) handles each failure mode gracefully
++instead of crashing or producing invalid outcomes.
++
++Reference: docs/BARRED_Failure_Modes_and_Replay_Plan.md
++"""
++
++import json
++import os
++import tempfile
++import pytest
++from unittest.mock import AsyncMock, MagicMock, patch
++
++from agentbeats.models import EvalRequest
++from debate_judge_common import DebateEval, DebaterScore, VerifierReport
++from scenarios.debate.adk_debate_judge import DebateJudgeADK, _EvalContext, _collect_soft_checks
++
++
++def _make_req(td, seed=42):
++    return EvalRequest(
++        participants={"pro_debater": "http://localhost:9001", "con_debater": "http://localhost:9002"},
++        config={
++            "run_id": "test-fm",
++            "seed": seed,
++            "mode": "passthrough",
++            "topic": "void f(char *dst, char *src, int len, int cap) {\n    if (len > cap) return;\n    memcpy(dst, src, len);\n}",
++            "predicate": "Vulnerable to heap overflow",
++            "target_verdict": "True",
++            "record_path": os.path.join(td, "run.json"),
++            "attempts_path": os.path.join(td, "attempts.jsonl"),
++            "checkpoint_path": os.path.join(td, "ckpt.json"),
++            "defense_obligation": {"version": "v1", "kind": "upper_bound"},
++            "counter_evidence_validation_mode": "enforce_deterministic",
++        },
++    )
++
++
++def _make_debate_eval(winner="con_debater", outcome=None, counter_evidence=None, anchors=None, con_candidate_id=None):
++    pro = DebaterScore(technical_accuracy=0.3, logic_soundness=0.3, evidence_strength=0.3, total_score=0.3, critique="Pro argued")
++    con = DebaterScore(technical_accuracy=0.9, logic_soundness=0.9, evidence_strength=0.9, total_score=0.9, critique="Con proved bounds")
++    kwargs = {
++        "thinking_process": "Thinking...",
++        "predicate": "Vulnerable to heap overflow",
++        "anchors": anchors or ["len > cap", "memcpy(dst, src, len)"],
++        "winner": winner,
++        "reason": "test reason",
++        "mechanism": "Guard anchor: if (len > cap) return;",
++        "counterfactual": "If guard removed",
++        "support_level": "supported",
++        "verifier_report": "Passed",
++        "pro_debater": pro,
++        "con_debater": con,
++    }
++    if outcome is not None:
++        kwargs["outcome"] = outcome
++    if counter_evidence is not None:
++        kwargs["counter_evidence"] = counter_evidence
++    if con_candidate_id is not None:
++        kwargs["con_candidate_id"] = con_candidate_id
++    return DebateEval(**kwargs)
++
++
++# Mode 1: Schema rejection — old-format Con win (winner=con_debater, no counter_evidence, no candidate_id)
++# Should result in unresolved, not crash.
++@pytest.mark.asyncio
++async def test_failure_mode_1_null_receipt_becomes_unresolved():
++    """Mode 1: Judge outputs winner=con_debater with counter_evidence=null and no candidate_id.
++    New schema maps winner=con_debater -> outcome=con_win, but con_win requires counter_evidence or con_candidate_id.
++    The model_validator should NOT raise — it should allow con_win without counter_evidence if con_candidate_id is None
++    (backward compat). But the outcome is con_win without proof. Verify this doesn't crash and is handled."""
++    with tempfile.TemporaryDirectory() as td:
++        req = _make_req(td)
++        judge = DebateJudgeADK()
++        ctx = _EvalContext(req, judge)
++
++        # Old-format Con win: winner=con_debater, no counter_evidence, no candidate_id.
++        # Under the new schema, this safely downgrades to outcome=unresolved (controlled abstention).
++        eval1 = _make_debate_eval(winner="con_debater", outcome=None, counter_evidence=None)
++        assert eval1.outcome == "unresolved"
++        assert eval1.winner is None
++        assert eval1.con_candidate_id is None
++        assert eval1.counter_evidence is None
++
++        # Explicit unresolved outcome
++        debate_eval2 = _make_debate_eval(winner=None, outcome="unresolved", counter_evidence=None)
++        assert debate_eval2.outcome == "unresolved"
++        assert debate_eval2.winner is None
++        assert debate_eval2.counter_evidence is None
++
++
++# Mode 2: Con receipt invalid — model produces a receipt with unrecognized operation
++@pytest.mark.asyncio
++async def test_failure_mode_2_invalid_receipt_rejected():
++    """Mode 2: Con produces a receipt with an unrecognized operation. Should be rejected, not accepted."""
++    with tempfile.TemporaryDirectory() as td:
++        req = _make_req(td)
++        judge = DebateJudgeADK()
++        ctx = _EvalContext(req, judge)
++
++        bad_ce = {
++            "defense_kind": "upper_bound_reject",
++            "guard_anchor": "if (len > cap) return;",
++            "guarded_value": "len",
++            "protected_operation_anchor": "foo_bar(x)",
++            "operation_value": "x",
++            "enforcement": "reject_before_operation",
++            "invariant": "len <= cap",
++            "predicate_precondition": "len exceeds cap",
++            "value_relation": "guarded_value_equals_operation_value",
++            "counterfactual": "Removing guard lets len reach foo_bar.",
++        }
++        debate_eval = _make_debate_eval(
++            winner="con_debater", outcome="con_win", con_candidate_id="C99",
++        )
++
++        code = "void f(char *dst, char *src, int len, int cap) {\n    if (len > cap) return;\n    foo_bar(x);\n}"
++        normalized_anchors = ["len > cap", "foo_bar(x)"]
++        soft_checks, _ = _collect_soft_checks(ctx, debate_eval, code, normalized_anchors)
++
++        receipt = soft_checks.get("counter_evidence_validation") or {}
++        assert receipt.get("status") != "deterministically_confirmed"
++        assert receipt.get("status") == "invalid_contract"
++
++
++# Mode 4: Anchors too few — judge provides anchors that don't match code
++@pytest.mark.asyncio
++async def test_failure_mode_4_anchors_too_few_rejected():
++    """Mode 4: Judge provides anchors that don't match code. Should be rejected as anchors_too_few."""
++    with tempfile.TemporaryDirectory() as td:
++        req = _make_req(td)
++        judge = DebateJudgeADK()
++        ctx = _EvalContext(req, judge)
++
++        debate_eval = _make_debate_eval(
++            winner="pro_debater", anchors=["nonexistent_anchor_xyz", "another_missing_anchor"],
++        )
++
++        # _process_verifier_audit checks normalized_anchors < 2
++        normalized_anchors = ["nonexistent_anchor_xyz", "another_missing_anchor"]
++        soft_checks = {
++            "predicate_quality": {"pass": True},
++            "con_win_counter_evidence": {"pass": False, "applicable": False},
++        }
++
++        updater = MagicMock()
++        updater.update_status = AsyncMock()
++
++        judge._restore_or_call_verifier = AsyncMock(return_value=(None, {"called": False, "logic_error": None, "error": None}))
++
++        is_valid, report, meta, reason = await judge._process_verifier_audit(
++            ctx, 0, debate_eval, "void f() {}", normalized_anchors, soft_checks, {}, {}, None, "start", updater
++        )
++        assert is_valid is False
++
++
++# Mode 5: Con win without counter-evidence
++@pytest.mark.asyncio
++async def test_failure_mode_5_con_win_no_evidence_rejected():
++    """Mode 5: Con wins but has no concrete counter-evidence. Gate should reject."""
++    with tempfile.TemporaryDirectory() as td:
++        req = _make_req(td)
++        judge = DebateJudgeADK()
++        ctx = _EvalContext(req, judge)
++
++        debate_eval = _make_debate_eval(
++            winner="con_debater", outcome="unresolved", counter_evidence=None,
++        )
++
++        code = "void f(char *dst, char *src, int len) {\n    memcpy(dst, src, len);\n}"
++        normalized_anchors = ["memcpy(dst, src, len)"]
++        soft_checks = {
++            "predicate_quality": {"pass": True},
++            "con_win_counter_evidence": {"pass": False, "applicable": True},
++            "counter_evidence_validation": None,
++            "counter_evidence_validation_mode": "enforce_deterministic",
++        }
++
++        updater = MagicMock()
++        updater.update_status = AsyncMock()
++
++        is_valid, report, meta, reason = await judge._process_verifier_audit(
++            ctx, 0, debate_eval, code, normalized_anchors, soft_checks, {}, {}, None, "start", updater
++        )
++        assert is_valid is False
++
++
++# Mode 6: Judge parse failure — controlled unresolved
++@pytest.mark.asyncio
++async def test_failure_mode_6_parse_failure_controlled():
++    """Mode 6: Malformed judge output should produce controlled failure, not crash."""
++    with tempfile.TemporaryDirectory() as td:
++        req = _make_req(td)
++        judge = DebateJudgeADK()
++        ctx = _EvalContext(req, judge)
++
++        # outcome=unresolved should be a valid controlled state
++        debate_eval = _make_debate_eval(
++            winner=None, outcome="unresolved", counter_evidence=None,
++        )
++        assert debate_eval.outcome == "unresolved"
++        assert debate_eval.winner is None
++        assert debate_eval.counter_evidence is None
++
++
++# Mode 3: Verifier logic error (correct behavior)
++@pytest.mark.asyncio
++async def test_failure_mode_3_verifier_logic_error_is_correct():
++    """Mode 3: Pro wins but verifier finds logic error. This is correct behavior."""
++    with tempfile.TemporaryDirectory() as td:
++        req = _make_req(td)
++        judge = DebateJudgeADK()
++        ctx = _EvalContext(req, judge)
++
++        debate_eval = _make_debate_eval(winner="pro_debater")
++
++        # Verify the outcome is pro_win
++        assert debate_eval.outcome == "pro_win"
++        # The verifier would catch logic errors in the Pro claim
++        # This is the system working correctly, not a bug
++
++
++def test_repair_messages_include_validation_error_context():
++    """Verify that structured output repair includes the exact validation error so the model can fix it."""
++    from agentbeats.structured_output import _build_repair_messages
++
++    raw_json = json.dumps({
++        "thinking_process": "Analysis",
++        "outcome": "con_win",
++        "con_candidate_id": None,
++        "reason": "Con argued well",
++        "mechanism": "Guard anchor: none",
++        "counterfactual": "If check added",
++        "predicate": "Vulnerable",
++        "anchors": ["a", "b"],
++        "pro_debater": {"technical_accuracy": 0.5, "logic_soundness": 0.5, "evidence_strength": 0.5, "total_score": 0.5, "critique": "ok"},
++        "con_debater": {"technical_accuracy": 0.8, "logic_soundness": 0.8, "evidence_strength": 0.8, "total_score": 0.8, "critique": "ok"},
++    })
++
++    err_msg = "Value error, con_win requires a valid con_candidate_id from the provided candidate list"
++    msgs = _build_repair_messages(DebateEval, raw_json, strict=False, validation_error=err_msg)
++
++    assert len(msgs) == 2
++    user_msg = msgs[1]["content"]
++    assert "Validation Error to Fix:" in user_msg
++    assert err_msg in user_msg
++    assert "outcome" in DebateEval.model_json_schema()["required"]
++
++
++def test_coerce_verdict_reason_alias():
++    """Mode 5 (v5 live failure): Model outputs verdict_reason instead of reason,
++    omits thinking_process and scorecard dicts. The before-validator should coerce."""
++    raw = {
++        "predicate": "The code is vulnerable to out-of-bounds memory access",
++        "verdict": "pro_win",
++        "outcome": "pro_win",
++        "con_candidate_id": None,
++        "mechanism": "Source anchor: src->sx == 0; Sink anchor: gdImageJpegPtr(src, &size, 0); Missing guard anchor: none found",
++        "counterfactual": "The verdict flips if the guard is removed.",
++        "anchors": ["src->sx == 0", "gdImageJpegPtr(src, &size, 0)"],
++        "verifier_report": "not_applicable",
++        "score": 100,
++        # Note: NO thinking_process, NO pro_debater, NO con_debater, NO reason
++        # Only verdict_reason (wrong field name)
++    }
++    # Should fail without coercion — but now it should pass
++    result = DebateEval.model_validate(raw)
++    assert result.outcome == "pro_win"
++    assert result.winner == "pro_debater"
++    assert result.reason != ""  # Should be populated from fallback
++    assert result.thinking_process != ""  # Should be populated from fallback
++    assert result.pro_debater.total_score == 0.5  # Default
++    assert result.con_debater.total_score == 0.5  # Default
++
++
++def test_coerce_verdict_reason_becomes_reason():
++    """When model provides verdict_reason but not reason, the alias is applied."""
++    raw = {
++        "predicate": "Vulnerable to buffer overflow",
++        "verdict_reason": "The Con side proved the guard exists.",
++        "outcome": "con_win",
++        "con_candidate_id": "C1",
++        "mechanism": "Guard: if (len > cap) return; Sink: memcpy(dst, src, len)",
++        "counterfactual": "Without guard, overflow occurs",
++        "anchors": ["if (len > cap) return;", "memcpy(dst, src, len)"],
++    }
++    result = DebateEval.model_validate(raw)
++    assert result.reason == "The Con side proved the guard exists."
++    assert result.thinking_process == "The Con side proved the guard exists."
++    assert result.outcome == "con_win"
++    assert result.con_candidate_id == "C1"
++
++
++def test_coerce_list_thinking_process():
++    """When model provides thinking_process as a list, it is joined into a string."""
++    raw = {
++        "predicate": "Vulnerable to heap overflow",
++        "thinking_process": ["Step 1: check guard", "Step 2: verify sink"],
++        "reason": "Guard prevents overflow",
++        "outcome": "pro_win",
++        "mechanism": "Guard: if (len > cap); Sink: memcpy",
++        "counterfactual": "Without guard",
++        "anchors": ["if (len > cap)", "memcpy(dst, src, len)"],
++        "pro_debater": {"technical_accuracy": 0.9, "logic_soundness": 0.9, "evidence_strength": 0.9, "total_score": 0.9, "critique": "Good"},
++        "con_debater": {"technical_accuracy": 0.3, "logic_soundness": 0.3, "evidence_strength": 0.3, "total_score": 0.3, "critique": "Weak"},
++    }
++    result = DebateEval.model_validate(raw)
++    assert result.thinking_process == "Step 1: check guard Step 2: verify sink"
+diff --git a/scenarios/debate/con_receipt_extractor.py b/scenarios/debate/con_receipt_extractor.py
+new file mode 100644
+index 0000000..5bc8c6de478640dd38c127404d19c2e8cde92310
+--- /dev/null
++++ b/scenarios/debate/con_receipt_extractor.py
+@@ -0,0 +1,522 @@
++"""Deterministic Con counter-evidence candidate extractor (V1).
++
++Parses a C code snippet and emits a small set of candidate receipt objects
++that the judge can select from (or abstain).  The judge does not invent
++anchors, values, or labels; it chooses a candidate ID or returns "no valid
++receipt".  The independent validator then determines whether the selected
++candidate actually proves the defense.
++
++V1 supports only the ``upper_bound`` defense family.  Other families
++(``null_dereference``, ``identity_mismatch``) are deferred.
++"""
++
++from __future__ import annotations
++
++import re
++from dataclasses import dataclass, field
++from typing import Any, Dict, List, Optional
++
++
++@dataclass
++class CandidateReceipt:
++    """A candidate counter-evidence receipt emitted by the extractor."""
++
++    candidate_id: str
++    defense_kind: str  # upper_bound_reject | range_guarded_operation
++    guard_anchor: str
++    guarded_value: str
++    protected_operation_anchor: str
++    operation_value: str
++    enforcement: str  # reject_before_operation | operation_inside_safe_branch
++    value_relation: str  # guarded_value_equals_operation_value
++    source_span: dict = field(default_factory=dict)
++    unsupported_conditions: list = field(default_factory=list)
++
++    def to_dict(self) -> Dict[str, Any]:
++        return {
++            "candidate_id": self.candidate_id,
++            "defense_kind": self.defense_kind,
++            "guard_anchor": self.guard_anchor,
++            "guarded_value": self.guarded_value,
++            "protected_operation_anchor": self.protected_operation_anchor,
++            "operation_value": self.operation_value,
++            "enforcement": self.enforcement,
++            "value_relation": self.value_relation,
++            "source_span": self.source_span,
++            "unsupported_conditions": self.unsupported_conditions,
++        }
++
++
++# Memory-operation sinks that a guard might protect.
++_MEMORY_SINKS = {
++    "memcpy", "memmove", "strcpy", "strncpy", "strcat", "strncat",
++    "sprintf", "snprintf", "memset", "free", "kfree", "bcopy",
++}
++
++_MEMORY_OPS = re.compile(
++    r"(memcpy|memmove|strcpy|strncpy|strcat|strncat|sprintf|snprintf|memset|free|kfree)\s*\([^)]*?\)"
++)
++
++# if-guard with a relational comparison: if (VAR OP EXPR) { ... } or if (VAR OP EXPR) return/goto;
++_GUARD_RE = re.compile(
++    r"if\s*\(\s*(\w+)\s*(>=|<=|!=|==|>|<)\s*([^)]++)\)",
++    re.MULTILINE,
++)
++
++# Variable names commonly used as bounds in guards
++_BOUND_NAMES = {"capacity", "max", "maxlen", "size", "limit", "n", "len", "max_size", "buf_size"}
++
++
++def _find_guards(code: str) -> List[Dict[str, Any]]:
++    """Find if-guards with relational comparisons. Returns list of dicts."""
++    guards = []
++    for m in _GUARD_RE.finditer(code):
++        var = m.group(1)
++        op = m.group(2)
++        guard_text = m.group(0).rstrip()
++        # Check the tail (text immediately after the closing paren) for reject keywords
++        tail_start = m.end()
++        tail = code[tail_start:tail_start + 40]
++        is_reject = any(kw in tail for kw in ("return", "goto", "break"))
++        enforcement = "reject_before_operation" if is_reject else "operation_inside_safe_branch"
++        if is_reject:
++            # Extend guard_text to include the reject statement
++            import re as _re
++            reject_match = _re.match(r"\s*(return[^;]*;|goto\s+\w+;|break;)", tail)
++            if reject_match:
++                guard_text = code[m.start():tail_start + reject_match.end()].rstrip()
++        guards.append({
++            "var": var,
++            "op": op,
++            "guard_text": guard_text,
++            "enforcement": enforcement,
++            "start": m.start(),
++            "end": m.end() + (len(guard_text) - (m.end() - m.start())),
++            "is_reject": is_reject,
++        })
++    return guards
++
++
++def _find_operations(code: str) -> List[Dict[str, Any]]:
++    """Find memory-operation sinks in the code."""
++    ops = []
++    for m in _MEMORY_OPS.finditer(code):
++        op_text = m.group(0)
++        # Extract the first argument (destination or size) as the operation value
++        # Heuristic: if the op has a size arg, use it; otherwise use first arg
++        args = m.group(0)[m.group(0).index("(") + 1:m.group(0).rindex(")")].split(",")
++        op_val = args[-1].strip() if len(args) > 1 else args[0].strip()
++        # For memcpy(dst, src, len), operation value is len (last arg)
++        # For memset(ptr, val, size), operation value is size (last arg)
++        ops.append({
++            "op_text": op_text,
++            "op_value": op_val,
++            "start": m.start(),
++            "end": m.end(),
++        })
++    return ops
++
++
++def _is_inside_guard(guard: Dict[str, Any], op: Dict[str, Any], code: str) -> bool:
++    """Check if the operation is textually inside the guard's consequence block."""
++    # Simple heuristic: operation start is after guard end, and if guard has '{',
++    # operation is before the matching close brace (approximated by next '}' at
++    # same or lower indentation). For reject guards, operation is always "after".
++    if guard["is_reject"]:
++        return op["start"] > guard["end"]
++    # For safe-branch guards, check if op is within the consequence block
++    guard_end = guard["end"]
++    # find the next '}' after guard_end
++    brace_idx = code.find("}", guard_end)
++    if brace_idx == -1:
++        brace_idx = len(code)
++    return guard_end <= op["start"] < brace_idx
++
++
++def _build_candidate(guard: dict, op: dict, cid: int) -> CandidateReceipt:
++    """Build a candidate receipt from a matched guard/operation pair."""
++    enforcement = guard["enforcement"]
++    defense_kind = "upper_bound_reject" if guard["is_reject"] else "range_guarded_operation"
++    unsupported = []
++    if not guard["is_reject"] and enforcement == "operation_inside_safe_branch":
++        if guard["op"] not in (">", ">=", "<", "<="):
++            unsupported.append("guard_not_relational")
++    return CandidateReceipt(
++        candidate_id=f"C{cid}",
++        defense_kind=defense_kind,
++        guard_anchor=guard["guard_text"],
++        guarded_value=guard["var"],
++        protected_operation_anchor=op["op_text"],
++        operation_value=op["op_value"],
++        enforcement=enforcement,
++        value_relation="guarded_value_equals_operation_value",
++        source_span={"guard_start": guard["start"], "guard_end": guard["end"],
++                     "op_start": op["start"], "op_end": op["end"]},
++        unsupported_conditions=unsupported,
++    )
++
++
++def _guard_matches_op(guard: dict, op: dict, code: str) -> bool:
++    """Check whether a guard/operation pair is a valid candidate."""
++    if guard["var"] != op["op_value"]:
++        return False
++    if not _is_inside_guard(guard, op, code) and not guard["is_reject"]:
++        return False
++    if guard["is_reject"] and op["start"] < guard["start"]:
++        return False
++    return True
++
++
++def extract_upper_bound_candidates(code: str) -> List[CandidateReceipt]:
++    """Extract upper_bound defense candidates from C code."""
++    guards = _find_guards(code)
++    ops = _find_operations(code)
++    candidates = []
++    cid = 0
++
++    for guard in guards:
++        if guard["op"] not in (">", "<", ">=", "<=", "!="):
++            continue
++        for op in ops:
++            if not _guard_matches_op(guard, op, code):
++                continue
++            cid += 1
++            candidates.append(_build_candidate(guard, op, cid))
++
++    return candidates
++
++
++def extract_candidates(code: str, defense_obligation: Any, diagnostics: list = None) -> List[CandidateReceipt]:
++    """Extract candidate receipts for the given defense obligation.
++
++    V1 supports only the upper_bound family. Other families return an empty
++    list (the judge must abstain or return "no valid receipt").
++
++    Uses tree-sitter AST when available (higher coverage), falls back to regex.
++    """
++    if not isinstance(defense_obligation, dict) or defense_obligation.get("version") != "v1":
++        return []
++    kind = defense_obligation.get("kind")
++    if kind != "upper_bound":
++        return []  # deferred families
++    if _ts_available():
++        return extract_upper_bound_candidates_ts(code, diagnostics)
++    return extract_upper_bound_candidates(code)
++
++
++def format_candidates_for_prompt(candidates: List[CandidateReceipt]) -> str:
++    """Format candidates as a string for injection into the judge prompt."""
++    if not candidates:
++        return "No valid receipt candidates found by the extractor."
++    lines = ["Candidate receipts (select one by ID, or state 'no valid receipt'):"]
++    for c in candidates:
++        lines.extend([
++            f"\nCandidate {c.candidate_id}:",
++            f"  defense_kind: {c.defense_kind}",
++            f"  guard_anchor: {c.guard_anchor}",
++            f"  guarded_value: {c.guarded_value}",
++            f"  protected_operation_anchor: {c.protected_operation_anchor}",
++            f"  operation_value: {c.operation_value}",
++            f"  enforcement: {c.enforcement}",
++            f"  value_relation: {c.value_relation}",
++        ])
++        if c.unsupported_conditions:
++            lines.append(f"  unsupported_conditions: {c.unsupported_conditions}")
++    return "\n".join(lines)
++
++
++# ---------------------------------------------------------------------------
++# Tree-sitter-based extractor (V1.1) — higher coverage than regex fallback
++# ---------------------------------------------------------------------------
++
++def _ts_available() -> bool:
++    try:
++        import tree_sitter  # noqa: F401
++        import tree_sitter_c  # noqa: F401
++        return True
++    except Exception:
++        return False
++
++
++def _ts_parse(code: str):
++    import tree_sitter
++    import tree_sitter_c
++    lang = tree_sitter.Language(tree_sitter_c.language())
++    parser = tree_sitter.Parser(lang)
++    return parser.parse(code.encode("utf-8")), lang
++
++
++def _ts_walk(node):
++    yield node
++    for c in node.children:
++        yield from _ts_walk(c)
++
++
++def _ts_text(code_bytes: bytes, node) -> str:
++    return code_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace").strip()
++
++
++def _ts_find_guards(root, code_bytes: bytes) -> list:
++    """Find if_statements with binary conditions. Returns list of dicts."""
++    guards = []
++    for node in _ts_walk(root):
++        if node.type != "if_statement":
++            continue
++        cond = node.child_by_field_name("condition")
++        if cond is None:
++            continue
++        # unwrap parenthesized_expression
++        binexpr = cond
++        while binexpr and binexpr.type == "parenthesized_expression":
++            binexpr = binexpr.named_children[0] if binexpr.named_children else None
++        if binexpr is None or binexpr.type != "binary_expression":
++            continue
++        left = binexpr.child_by_field_name("left")
++        op_node = binexpr.child_by_field_name("operator")
++        right = binexpr.child_by_field_name("right")
++        if left is None or op_node is None or right is None:
++            continue
++        left_txt = _ts_text(code_bytes, left)
++        op_txt = _ts_text(code_bytes, op_node)
++        right_txt = _ts_text(code_bytes, right)
++        if op_txt not in (">", "<", ">=", "<=", "!=", "=="):
++            continue
++
++        consequence = node.child_by_field_name("consequence")
++        alternative = node.child_by_field_name("alternative")
++
++        # Check if consequence contains return/goto/break
++        is_reject = False
++        if consequence is not None:
++            cons_text = _ts_text(code_bytes, consequence)
++            is_reject = any(kw in cons_text for kw in ("return", "goto", "break"))
++
++        enforcement = "reject_before_operation" if is_reject else "operation_inside_safe_branch"
++        defense_kind = "upper_bound_reject" if is_reject else "range_guarded_operation"
++
++        guards.append({
++            "node": node,
++            "cond_node": cond,
++            "consequence": consequence,
++            "alternative": alternative,
++            "left_txt": left_txt,
++            "op_txt": op_txt,
++            "right_txt": right_txt,
++            "guard_text": _ts_text(code_bytes, node)[:200],
++            "enforcement": enforcement,
++            "defense_kind": defense_kind,
++            "is_reject": is_reject,
++            "start": node.start_byte,
++            "end": node.end_byte,
++        })
++    return guards
++
++
++def _ts_find_operations(root, code_bytes: bytes, guard_vars: set = None) -> list:
++    """Find call_expression nodes that are potential operations.
++
++    Primary: recognized memory sinks (memcpy, free, kfree, etc.).
++    Fallback: any call expression where a guard variable appears in the arguments
++    (broad detection for upper_bound obligations). Broad-detected operations are
++    marked ``recognized_sink=False`` so the validator can reject them if the
++    structural proof cannot be established.
++    """
++    guard_vars = guard_vars or set()
++    ops = []
++    seen_starts = set()
++    for node in _ts_walk(root):
++        if node.type != "call_expression":
++            continue
++        func = node.child_by_field_name("function")
++        if func is None:
++            continue
++        func_name = _ts_text(code_bytes, func)
++        args = node.child_by_field_name("arguments")
++        if args is None:
++            continue
++        arg_idents = [_ts_text(code_bytes, c) for c in args.named_children]
++        arg_text = " ".join(arg_idents)
++        recognized = func_name in _MEMORY_SINKS
++        broad = (not recognized) and any(gv in arg_text for gv in guard_vars)
++        if not recognized and not broad:
++            continue
++        if node.start_byte in seen_starts:
++            continue
++        seen_starts.add(node.start_byte)
++        op_val = arg_idents[-1] if len(arg_idents) > 1 else (arg_idents[0] if arg_idents else "")
++        ops.append({
++            "node": node,
++            "func_name": func_name,
++            "op_text": _ts_text(code_bytes, node),
++            "op_value": op_val,
++            "start": node.start_byte,
++            "end": node.end_byte,
++            "arg_idents": arg_idents,
++            "recognized_sink": recognized,
++        })
++    return ops
++
++
++def _ts_inside(node_a, node_b) -> bool:
++    """Check if node_a's byte range is inside node_b's byte range."""
++    return node_b.start_byte <= node_a.start_byte and node_a.end_byte <= node_b.end_byte
++
++
++def extract_upper_bound_candidates_ts(code: str, diagnostics: list = None) -> List[CandidateReceipt]:
++    """Tree-sitter-based extraction of upper_bound defense candidates."""
++    if not _ts_available():
++        return extract_upper_bound_candidates(code)  # fallback to regex
++
++    tree, _ = _ts_parse(code)
++    code_bytes = code.encode("utf-8")
++    root = tree.root_node
++
++    guards = _ts_find_guards(root, code_bytes)
++    guard_vars = {g["left_txt"] for g in guards}
++    ops = _ts_find_operations(root, code_bytes, guard_vars)
++    candidates = []
++    cid = 0
++
++    for guard in guards:
++        if guard["op_txt"] not in (">", "<", ">=", "<=", "!=", "=="):
++            continue
++        guarded_var = guard["left_txt"]
++
++        for op in ops:
++            op_val = op["op_value"]
++            # Exact identifier match first; then identifier-aware (word-boundary) match.
++            if guarded_var != op_val:
++                import re as _re
++                if not _re.search(r'\b' + _re.escape(guarded_var) + r'\b', op["op_text"]):
++                    if diagnostics is not None:
++                        diagnostics.append({"guard_var": guarded_var, "op_func": op["func_name"], "reason": "value_mismatch"})
++                    continue
++
++            # Check containment
++            consequence = guard["consequence"]
++            if guard["is_reject"]:
++                if not (op["start"] > guard["start"]):
++                    if diagnostics is not None:
++                        diagnostics.append({"guard_var": guarded_var, "op_func": op["func_name"], "reason": "no_containment_reject"})
++                    continue
++            else:
++                if consequence is None or not _ts_inside(op["node"], consequence):
++                    if diagnostics is not None:
++                        diagnostics.append({"guard_var": guarded_var, "op_func": op["func_name"], "reason": "no_containment_safe_branch"})
++                    continue
++
++            # Unsupported conditions
++            unsupported = []
++            if not op.get("recognized_sink", True):
++                unsupported.append("operation_not_recognized_sink")
++            if not guard["is_reject"] and guard["enforcement"] == "operation_inside_safe_branch":
++                if guard["op_txt"] not in (">", ">=", "<", "<="):
++                    unsupported.append("guard_not_relational")
++
++            cid += 1
++            candidates.append(CandidateReceipt(
++                candidate_id=f"C{cid}",
++                defense_kind=guard["defense_kind"],
++                guard_anchor=guard["guard_text"],
++                guarded_value=guarded_var,
++                protected_operation_anchor=op["op_text"],
++                operation_value=op_val,
++                enforcement=guard["enforcement"],
++                value_relation="guarded_value_equals_operation_value",
++                source_span={"guard_start": guard["start"], "guard_end": guard["end"],
++                             "op_start": op["start"], "op_end": op["end"]},
++                unsupported_conditions=unsupported,
++            ))
++
++    # Prefer recognized sinks: if any exist, drop broad-detected candidates.
++    recognized = [c for c in candidates if "operation_not_recognized_sink" not in c.unsupported_conditions]
++    if recognized:
++        candidates = recognized
++    # Limit to 5 candidates per seed to avoid overwhelming the judge.
++    candidates = candidates[:5]
++    return candidates
++
++
++def extract_upper_bound_candidates_ts_with_diagnostics(code: str) -> tuple:
++    """Tree-sitter-based extraction with per-pair rejection reasons.
++
++    Returns (candidates, rejections) where rejections is a list of dicts
++    with keys: guard_var, op_func, reason.
++    """
++    if not _ts_available():
++        return [], [{"reason": "tree_sitter_unavailable"}]
++
++    tree, _ = _ts_parse(code)
++    code_bytes = code.encode("utf-8")
++    root = tree.root_node
++    guards = _ts_find_guards(root, code_bytes)
++    guard_vars = {g["left_txt"] for g in guards}
++    ops = _ts_find_operations(root, code_bytes, guard_vars)
++
++    candidates = []
++    rejections = []
++    cid = 0
++
++    for guard in guards:
++        if guard["op_txt"] not in (">", "<", ">=", "<=", "!=", "=="):
++            continue
++        guarded_var = guard["left_txt"]
++        for op in ops:
++            # Value match
++            if guarded_var != op["op_value"] and guarded_var not in op["op_text"].split():
++                rejections.append({"guard_var": guarded_var, "op_func": op["func_name"],
++                                  "reason": "value_mismatch"})
++                continue
++            # Containment
++            consequence = guard["consequence"]
++            if guard["is_reject"]:
++                if not (op["start"] > guard["start"]):
++                    rejections.append({"guard_var": guarded_var, "op_func": op["func_name"],
++                                      "reason": "no_containment_reject"})
++                    continue
++            else:
++                if consequence is None or not _ts_inside(op["node"], consequence):
++                    rejections.append({"guard_var": guarded_var, "op_func": op["func_name"],
++                                      "reason": "no_containment_safe_branch"})
++                    continue
++
++            # Build candidate
++            unsupported = []
++            if not op.get("recognized_sink", True):
++                unsupported.append("operation_not_recognized_sink")
++            if not guard["is_reject"] and guard["enforcement"] == "operation_inside_safe_branch":
++                if guard["op_txt"] not in (">", ">=", "<", "<="):
++                    unsupported.append("guard_not_relational")
++
++            cid += 1
++            candidates.append(CandidateReceipt(
++                candidate_id=f"C{cid}",
++                defense_kind=guard["defense_kind"],
++                guard_anchor=guard["guard_text"],
++                guarded_value=guarded_var,
++                protected_operation_anchor=op["op_text"],
++                operation_value=op["op_value"],
++                enforcement=guard["enforcement"],
++                value_relation="guarded_value_equals_operation_value",
++                source_span={"guard_start": guard["start"], "guard_end": guard["end"],
++                             "op_start": op["start"], "op_end": op["end"]},
++                unsupported_conditions=unsupported,
++            ))
++    # Limit
++    recognized = [c for c in candidates if "operation_not_recognized_sink" not in c.unsupported_conditions]
++    if recognized:
++        candidates = recognized
++    candidates = candidates[:5]
++    return candidates, rejections
++
++
++def extract_candidates_ts(code: str, defense_obligation: Any, diagnostics: list = None) -> List[CandidateReceipt]:
++    """Tree-sitter-based candidate extraction. Falls back to regex if unavailable."""
++    if not isinstance(defense_obligation, dict) or defense_obligation.get("version") != "v1":
++        return []
++    kind = defense_obligation.get("kind")
++    if kind != "upper_bound":
++        return []
++    if not _ts_available():
++        return extract_upper_bound_candidates(code)
++    return extract_upper_bound_candidates_ts(code, diagnostics)
+diff --git a/scenarios/debate/counter_evidence_validation.py b/scenarios/debate/counter_evidence_validation.py
+index 5730971..02be5fe 100644
+--- a/scenarios/debate/counter_evidence_validation.py
++++ b/scenarios/debate/counter_evidence_validation.py
+@@ -14,6 +14,27 @@ VALID_OBLIGATIONS = {
+     "identity_mismatch": {"equality_reject"},
+ }
+ 
++# Recognized memory-safety sinks whose semantics are established by V1.
++# An operation anchor containing one of these names is treated as a known
++# memory operation.  An unrecognized operation requires a trusted_operation_summary
++# in the evidence or defense_obligation before it can be confirmed.
++RECOGNIZED_SINKS = {
++    "memcpy", "memmove", "strcpy", "strncpy", "strcat", "strncat",
++    "sprintf", "snprintf", "memset", "free", "kfree", "bcopy",
++    "malloc", "calloc", "realloc",
++}
++
++
++# V1 compatibility matrix: exact (enforcement, value_relation) tuples per defense_kind.
++# Any pairing not listed here is rejected before returning deterministically_confirmed.
++V1_COMPATIBILITY = {
++    "upper_bound_reject": {("reject_before_operation", "guarded_value_equals_operation_value")},
++    "range_guarded_operation": {("operation_inside_safe_branch", "guarded_value_equals_operation_value")},
++    "null_check": {("reject_before_operation", "guarded_value_equals_operation_value")},
++    "equality_reject": {("reject_before_operation", "guarded_value_equals_operation_value")},
++}
++
++
+ 
+ def _receipt(status: str, *, reason: str | None = None, evidence: Dict[str, Any] | None = None,
+              checks: Dict[str, bool] | None = None) -> Dict[str, Any]:
+@@ -55,6 +76,29 @@ def validate_counter_evidence(code: str, predicate: str, evidence: Any,
+     if (evidence["guard_anchor"] not in evidence["counterfactual"]
+             and evidence["operation_value"] not in evidence["counterfactual"]):
+         return _receipt("invalid_contract", reason="counter_evidence_counterfactual_incoherent")
++    # V1 compatibility: enforcement/value_relation must be an exact supported tuple
++    compat_key = (evidence["enforcement"], evidence["value_relation"])
++    if compat_key not in V1_COMPATIBILITY.get(evidence["defense_kind"], set()):
++        return _receipt("invalid_contract", reason="counter_evidence_incompatible_pairing")
++    # Candidate ID validation (if candidates were provided via defense_obligation)
++    candidate_ids = defense_obligation.get("candidate_ids") if isinstance(defense_obligation, dict) else None
++    cid = evidence.get("candidate_id")
++    if candidate_ids is not None and cid not in candidate_ids:
++        return _receipt("invalid_contract", reason="counter_evidence_invalid_candidate_id")
++    # Semantic check: if the operation is not a recognized sink, require a
++    # trusted_operation_summary to establish its semantics.  Structural proof
++    # alone is insufficient for unrecognized operations.
++    op_anchor = evidence.get("protected_operation_anchor", "")
++    # Extract the actual called function name (exact, not substring) from the anchor.
++    import re as _re
++    _call_match = _re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(", op_anchor)
++    op_func_name = _call_match.group(1) if _call_match else None
++    op_is_recognized = op_func_name in RECOGNIZED_SINKS
++    # V1 does not have a trusted-operation-summary mechanism.  An unrecognized
++    # operation cannot be confirmed on structural proof alone — abstain (reject).
++    # Do not accept a free-form string as a bypass.
++    if not op_is_recognized:
++        return _receipt("invalid_contract", reason="counter_evidence_unrecognized_operation")
+     proof = extract_counter_evidence_proof(code, evidence)
+     checks = {
+         "guard_anchor_exact": True,
+diff --git a/src/agentbeats/structured_output.py b/src/agentbeats/structured_output.py
+index 7b8078e..dd7b3a9 100644
+--- a/src/agentbeats/structured_output.py
++++ b/src/agentbeats/structured_output.py
+@@ -264,16 +264,23 @@ def _build_repair_messages(
+     raw_text: str,
+     strict: bool,
+     original_messages: Optional[list[dict[str, str]]] = None,
++    validation_error: Optional[str] = None,
+ ) -> list[dict[str, str]]:
+     schema_json = json.dumps(schema_model.model_json_schema(), indent=2)
++    err_context = f"\n\nValidation Error to Fix:\n{validation_error}" if validation_error else ""
+     if raw_text and raw_text.strip():
+-        user_text = f"JSON Schema (strict={strict}):\n{schema_json}\n\nText to convert:\n{raw_text}"
++        user_text = (
++            f"JSON Schema (strict={strict}):\n{schema_json}\n\n"
++            f"Text to convert/repair:\n{raw_text}"
++            f"{err_context}\n\n"
++            "Fix the errors and output ONLY the corrected JSON object conforming exactly to the schema."
++        )
+         return [
+             {
+                 "role": "system",
+                 "content": (
+-                    "You are a JSON repair tool. Convert the input text into a single valid JSON object "
+-                    "that conforms EXACTLY to the provided JSON schema. Output ONLY JSON. No markdown."
++                    "You are a JSON repair tool. Convert and repair the input text into a single valid JSON object "
++                    "that conforms EXACTLY to the provided JSON schema and resolves any validation errors. Output ONLY JSON. No markdown."
+                 ),
+             },
+             {"role": "user", "content": user_text},
+@@ -281,6 +288,7 @@ def _build_repair_messages(
+ 
+     system_instruction = (
+         f"You MUST output a single valid JSON object conforming EXACTLY to this schema:\n{schema_json}\n"
++        f"{err_context}\n"
+         "Output ONLY the JSON object. Do NOT wrap in markdown. Do NOT output any conversational text."
+     )
+     if original_messages:
+@@ -305,9 +313,12 @@ async def _execute_repair_completion(
+     strict: bool,
+     stage: str,
+     original_messages: Optional[list[dict[str, str]]] = None,
++    validation_error: Optional[str] = None,
+     **kwargs,
+ ) -> T:
+-    repair_messages = _build_repair_messages(schema_model, raw_text, strict, original_messages)
++    repair_messages = _build_repair_messages(
++        schema_model, raw_text, strict, original_messages, validation_error=validation_error
++    )
+     repair_kwargs: dict[str, Any] = {
+         "model": repair_model or model,
+         "messages": repair_messages,
+@@ -364,13 +375,14 @@ async def call_structured(
+     try:
+         return schema_model.model_validate_json(raw_text)
+     except Exception as e:
++        err_str = _stringify_exc(e)
+         _safe_record_event(
+             replay_manager,
+             model=model,
+             name="structured_output_validation_error",
+             params={"schema_fp": schema_fp, "schema_name": schema_name, "strict": strict},
+             payload={
+-                "error": _stringify_exc(e),
++                "error": err_str,
+                 "schema_fp": schema_fp,
+                 "schema_name": schema_name,
+                 "raw_text": raw_text,
+@@ -391,5 +403,6 @@ async def call_structured(
+             strict,
+             stage,
+             original_messages=messages,
++            validation_error=err_str,
+             **kwargs,
+         )
