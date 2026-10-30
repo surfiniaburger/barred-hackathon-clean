@@ -117,11 +117,11 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 
 | Flag | Purpose & Impact |
 | :--- | :--- |
-| `--seeds cve_seeds_smoke_2gate.jsonl` | Loads the two test cases: Seed 42 (Supported memcpy guard) and Seed 43 (Unsupported wrapper). |
+| `--seeds cve_seeds_smoke_2gate.jsonl` | Loads the two test cases: safe_copy (synthetic, supported memcpy guard) and Seed 90 (gdImageJpegPtr, unsupported wrapper). |
 | `--counter-evidence-validation-mode enforce_deterministic` | **The Core Innovation**: Engages the AST evidence gate. Blocks any model claim lacking an invariant proof. |
-| `--halt-on-con-win` | **Efficiency & Proof**: Halts execution the instant deterministic proof is confirmed (Seed 42 halts on Round 0). |
+| `--halt-on-con-win` | **Efficiency & Proof**: Halts execution the instant deterministic proof is confirmed (safe_copy halts on Round 0). |
 | `--slice-judge` | Slices code context specifically for judge adjudication, stripping misleading context. |
-| `--reflector --reflector-mode symmetric --escalate-pareto` | **Multi-Turn Epistemic Escalation**: When the gate catches a hallucination in Round 0 (Seed 43), reflection forces the model to re-evaluate and admit `unresolved` in Round 1. |
+| `--reflector --reflector-mode symmetric --escalate-pareto` | **Multi-Turn Epistemic Escalation**: When the gate catches a hallucination in Round 0 (Seed 90), reflection forces the model to re-evaluate and admit `unresolved` in Round 1. |
 | `--mode record` | Records bit-for-bit LLM prompt/response cassettes and attempt telemetry for auditability. |
 
 ---
@@ -130,9 +130,9 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 
 | Case | Scenario | Model Action | Deterministic Gate Action | Final Verdict |
 | :--- | :--- | :--- | :--- | :--- |
-| **Case 1 (Seed 42)** | `safe_copy`: upper-bound guard (`len >= cap`) protecting `memcpy(dst, src, len)` | Selects Candidate `C1` | **Confirmed**: 7/7 AST checks verify guard dominates sink | **`PASS`** |
-| **Case 2 (Seed 43 R1)** | `gdImageJpegPtr`: zero-width test on 3rd-party wrapper | Model refrains (`candidate_id: null`) | **Epistemic Bound**: AST domain refuses to certify unknown sinks | **`UNRESOLVED`** |
-| **Case 3 (Seed 43 R0)** | Superficial/ungrounded check before memory operation | Model attempts hallucination (`C1`) | **Blocked**: Gate rejects ungrounded candidate | **`BLOCKED`** |
+| **Case 1 (safe_copy)** | `safe_copy`: upper-bound guard (`len >= cap`) protecting `memcpy(dst, src, len)` | Selects Candidate `C1` | **Confirmed**: 7/7 AST checks verify guard dominates sink | **`PASS`** |
+| **Case 2 (Seed 90 R1)** | `gdImageJpegPtr`: zero-width test on 3rd-party wrapper | Model refrains (`candidate_id: null`) | **Epistemic Bound**: AST domain refuses to certify unknown sinks | **`UNRESOLVED`** |
+| **Case 3 (Seed 90 R0)** | Superficial/ungrounded check before memory operation | Model attempts hallucination (`C1`) | **Blocked**: Gate rejects ungrounded candidate | **`BLOCKED`** |
 
 ---
 
@@ -154,13 +154,13 @@ In baseline unconstrained multi-agent debate runs, models routinely suffered fro
    - *Previous Defect:* Models claimed safety when a bounds check occurred *after* the vulnerable memory operation (`memcpy`), or checked unrelated variables (e.g., checking `cap > len` or checking `size` while copying `len`).
    - *Fix:* The AST validator strictly enforces control-flow dominance (guard must precede and dominate sink) and variable-binding equality (`guarded_value_equals_operation_value`).
 3. **Semantic Validation Gap for Unknown Sinks (`test_con_receipt_e2e.py`)**:
-   - *Previous Defect:* Superficial guards on 3rd-party library calls (e.g. `gdImageJpegPtr` in Seed 43) were erroneously claimed as bounded safety proofs.
+   - *Previous Defect:* Superficial guards on 3rd-party library calls (e.g. `gdImageJpegPtr` in Seed 90) were erroneously claimed as bounded safety proofs.
    - *Fix:* Non-standard memory sinks without formal trusted operation summaries are flagged (`operation_not_recognized_sink`) and rejected (`counter_evidence_unrecognized_operation`), forcing honest abstention (`UNRESOLVED`).
 4. **Resilient Schema Coercion & Parse Recovery (`test_debate_eval_schema.py`)**:
    - *Previous Defect:* Live LLM variations outputting `verdict_reason` instead of `reason`, formatting `thinking_process` as a JSON array, or omitting scorecard sub-dictionaries caused unhandled crashes.
    - *Fix:* Robust Pydantic before-validators and repair context coercion automatically harmonize variations without compromising validation rigor.
 5. **Early Deterministic Halting & Multi-Turn Reflection**:
-   - *Live Result:* Confirmed defenses (Seed 42) halt immediately on Round 0 (`--halt-on-con-win`), preventing compute waste and regression. In Seed 43, when Round 0 hallucination was rejected, symmetric reflection forced the model to concede `unresolved` on Round 1.
+   - *Live Result:* Confirmed defenses (safe_copy) halt immediately on Round 0 (`--halt-on-con-win`), preventing compute waste and regression. In Seed 90, when Round 0 hallucination was rejected, symmetric reflection forced the model to concede `unresolved` on Round 1.
 
 ---
 

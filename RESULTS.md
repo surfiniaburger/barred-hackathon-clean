@@ -33,14 +33,14 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 | **Actually SAFE** (proved_safe) | **TN = 1** ✅ | FP = 0 |
 | **Actually VULNERABLE** (confirmed_vulnerable) | FN = 0 | TP = 0 |
 
-- **Abstentions (context_deficient / UNRESOLVED):** 1 (Seed 43 — correct epistemic boundary)
+- **Abstentions (context_deficient / UNRESOLVED):** 1 (Seed 90 — correct epistemic boundary)
 - **Accuracy on decided seeds:** 100.0%
 - **False Positive Rate:** 0.0% (0 / 1 safe seed)
 - **False Negative Rate:** 0.0% (0 / 0 vulnerable seeds with a decision)
 
 ### Sampling Variance Note
 
-The evidence_pack run (Muse-Glimmer 30B, temperature 1.0) produced a **PASS** on Seed 42 (Con selected C1, receipt validated). Subsequent runs on the same model and seeds (v10, v12) produced **UNRESOLVED** on Seed 42 instead. The difference is LLM sampling variance at temperature 1.0, not a code or model change.
+The evidence_pack run (Muse-Glimmer 30B, temperature 1.0) produced a **PASS** on safe_copy (synthetic fixture) (Con selected C1, receipt validated). Subsequent runs on the same model and seeds (v10, v12) produced **UNRESOLVED** on safe_copy (synthetic fixture) instead. The difference is LLM sampling variance at temperature 1.0, not a code or model change.
 
 The gate's core guarantee held in all runs: **0.0% false pass rate** (no invalid receipt was ever certified). The variance is in defense *discovery* (whether the model selects the valid candidate C1), not in the gate's *refusal to certify bad ones*.
 
@@ -78,7 +78,7 @@ Reference run: `evidence_pack/` — see `gemini-rep1-armD.jsonl` baseline casset
 ## What the Numbers Mean
 
 - **FP = 0** means BARRED never declared a vulnerable CVE "safe" — the machine-verifiable proof requirement enforces this.
-- **1 correct abstention** (Seed 43) demonstrates BARRED's epistemic honesty: it refuses to certify what it cannot prove, rather than hallucinating a verdict.
+- **1 correct abstention** (Seed 90) demonstrates BARRED's epistemic honesty: it refuses to certify what it cannot prove, rather than hallucinating a verdict.
 - The 8 `context_deficient` seeds illustrate the honest boundary of formal verification: when source context is insufficient, the system abstains cleanly rather than guessing.
 
 ---
