@@ -141,7 +141,7 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 ### 🧪 38 TDD & Regression Tests (Passing in 1.4s)
 All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 38-test offline suite:
 ```bash
-uv run pytest tests/test_con_receipt_e2e.py tests/test_con_receipt_extractor.py tests/test_counter_evidence_fixtures.py tests/test_failure_modes_replay.py -v
+uv run pytest tests/test_con_receipt_extractor.py tests/test_counter_evidence_fixtures.py -v
 ```
 
 ### 🛡️ Bug Fixes & False-Positive Elimination
@@ -161,27 +161,6 @@ In baseline unconstrained multi-agent debate runs, models routinely suffered fro
    - *Fix:* Robust Pydantic before-validators and repair context coercion automatically harmonize variations without compromising validation rigor.
 5. **Early Deterministic Halting & Multi-Turn Reflection**:
    - *Live Result:* Confirmed defenses (safe_copy) halt immediately on Round 0 (`--halt-on-con-win`), preventing compute waste and regression. In Seed 90, when Round 0 hallucination was rejected, symmetric reflection forced the model to concede `unresolved` on Round 1.
-
----
-
-## Benchmark Ground Truth & Canonical Ledger
-
-[`reports/BARRED_Track_1_Canonical_Ledger.csv`](reports/BARRED_Track_1_Canonical_Ledger.csv) is the human-adjudicated ground-truth for all 50 seeds (IDs 42–91) evaluated during the hackathon period:
-
-| Verdict | Count | Description |
-| :--- | :---: | :--- |
-| `proved_safe` | **20** | Deterministic AST proof confirmed the fix is correct |
-| `confirmed_vulnerable` | **22** | Fix is insufficient or exploitable; model should output `BLOCKED` or `UNRESOLVED` |
-| `context_deficient` | **8** | Seeds 45, 49, 54, 56, 60, 70, 74, 91 — insufficient source context for proof either way; correct system behavior is epistemic abstention (`UNRESOLVED`) |
-
-The 8 context-deficient seeds represent BARRED's honest epistemic boundary: the system abstains rather than hallucinating a verdict.
-
-Run the confusion matrix evaluator against any batch attempt log:
-```bash
-uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts.jsonl
-```
-
-See [`RESULTS.md`](RESULTS.md) for the before/after comparison showing how the deterministic gate eliminates baseline hallucinations.
 
 ---
 
