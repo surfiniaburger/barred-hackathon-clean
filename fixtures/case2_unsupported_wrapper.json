@@ -1,0 +1,15 @@
+{
+  "case_id": "case2_unsupported_wrapper",
+  "title": "Unsupported Domain: Library Wrapper (gdImageJpegPtr)",
+  "language": "c",
+  "code": "int test_jpeg_zero_width() {\n    gdImagePtr src, dst;\n    int size;\n    src = gdImageCreateTrueColor(1, 10);\n    gdTestAssert(src != NULL);\n    src->sx = 0; /* test hack forcing gdImageJpegPtr() to fail */\n    dst = gdImageJpegPtr(src, &size, 0);\n    gdTestAssert(dst == NULL);\n    gdImageDestroy(src);\n    return 0;\n}",
+  "predicate": "The code is vulnerable to out-of-bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+  "defense_obligation": {
+    "version": "v1",
+    "kind": "upper_bound"
+  },
+  "expected_outcome": "UNRESOLVED",
+  "expected_reason": "unsupported_proof_domain",
+  "description": "The code calls a third-party library wrapper 'gdImageJpegPtr'. Because this is outside the V1 deterministic memory-sink domain, BARRED refuses to hallucinate either a PASS or a FAIL. It terminates with an explicit UNRESOLVED boundary."
+}
+

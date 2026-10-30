@@ -1,0 +1,15 @@
+{
+  "case_id": "case3_failure_contrast",
+  "title": "Failure Contrast: Superficial Guard Blocking / Refusal to Hallucinate",
+  "language": "c",
+  "code": "void process_packet(char *dst, const char *src, int len, int cap) {\n    if (len == 0) {\n        return;\n    }\n    memcpy(dst, src, len);\n}",
+  "predicate": "The code is vulnerable to a heap buffer overflow because memcpy executes with unchecked len exceeding cap.",
+  "defense_obligation": {
+    "version": "v1",
+    "kind": "upper_bound"
+  },
+  "expected_outcome": "BLOCKED",
+  "expected_reason": "invalid_contract_no_bounding_guard",
+  "description": "The developer claims adding 'if (len == 0) return;' resolves the buffer overflow. While an LLM might be persuaded by fluent arguments that zero-length edge cases are handled, BARRED's deterministic extractor and validator reject this: no upper-bound guard dominates the sink. The assertion is BLOCKED."
+}
+

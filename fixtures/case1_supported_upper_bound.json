@@ -1,0 +1,15 @@
+{
+  "case_id": "case1_supported_upper_bound",
+  "title": "Supported Fix: Upper-Bound Guard Protecting memcpy (safe_copy)",
+  "language": "c",
+  "code": "void safe_copy(char *dst, const char *src, int len, int cap) {\n    if (len >= cap) {\n        return;\n    }\n    memcpy(dst, src, len);\n}",
+  "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+  "defense_obligation": {
+    "version": "v1",
+    "kind": "upper_bound"
+  },
+  "expected_outcome": "PASS",
+  "expected_candidate_id": "C1",
+  "description": "The developer added 'if (len >= cap) return;' before 'memcpy(dst, src, len)'. BARRED extracts candidate C1, Meta model identifies and selects C1, and deterministic AST verification confirms the guard dominates the sink and preserves safety invariants."
+}
+

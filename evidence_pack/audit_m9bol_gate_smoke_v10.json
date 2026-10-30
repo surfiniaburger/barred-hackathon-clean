@@ -1,0 +1,57 @@
+{
+  "run_id": "m9bol-gate-smoke-v10",
+  "audit_timestamp": "2026-10-28T10:34:00Z",
+  "model": {
+    "provider": "Meta Superintelligence Labs / Uzu",
+    "name": "openai/trymirai/Muse-Glimmer-30B-M",
+    "architecture": "30B Multimodal Dense Transformer (Llama BPE Tokenizer, Distilled from Muse Spark)",
+    "role": "Agentic Security Reviewer & Candidate Selector"
+  },
+  "deterministic_gates": {
+    "candidate_extractor": "con_receipt_extractor_v1 (AST Tree-sitter + Regex Fallback)",
+    "validator": "counter_evidence_validation_v1 (AST Dominance & Value-Flow Relation Engine)"
+  },
+  "cases_audited": [
+    {
+      "seed": 42,
+      "case": "Supported Fix (safe_copy / memcpy with upper-bound guard)",
+      "round": 0,
+      "model_selection": "Candidate C1 (upper_bound_reject)",
+      "deterministic_checks": {
+        "anchors_are_functional": true,
+        "control_flow_valid": true,
+        "counterfactual_coherent": true,
+        "guard_anchor_exact": true,
+        "operation_anchor_exact": true,
+        "predicate_precondition_blocked": true,
+        "value_relation_valid": true
+      },
+      "gate_status": "deterministically_confirmed",
+      "terminal_outcome": "PASS",
+      "evidence_trace": "rejecting_guard_dominates_operation: guard 'if (len >= cap)' precedes 'memcpy(dst, src, len)' on all paths with identical variable 'len'.",
+      "benchmark_seed_note": "synthetic safe_copy fixture (proved safe by construction; verdict aligns with ledger seed 42)"
+    },
+    {
+      "seed": 90,
+      "case": "Unsupported Domain (gdImageJpegPtr zero-width wrapper test)",
+      "round": 0,
+      "model_selection": "Hallucinated C1 attempt",
+      "gate_status": "invalid_contract",
+      "gate_action": "BLOCKED: The model attempted to hallucinate a candidate C1 on code lacking a recognized memory sink. Intercepted by deterministic contract gate.",
+      "failure_reasons": [
+        "counter_evidence_missing"
+      ],
+      "benchmark_seed_note": "benchmark seed 90 (context_deficient per canonical ledger)"
+    },
+    {
+      "seed": 90,
+      "case": "Unsupported Domain (gdImageJpegPtr zero-width wrapper test)",
+      "round": 1,
+      "model_selection": "Self-corrected under escalation to outcome='unresolved', candidate_id=null",
+      "gate_status": "epistemic_boundary_respected",
+      "terminal_outcome": "UNRESOLVED",
+      "reason": "unsupported_proof_domain: Third-party library wrapper is outside deterministic memory-safety domain V1. Refused to certify safety.",
+      "benchmark_seed_note": "benchmark seed 90 (context_deficient per canonical ledger)"
+    }
+  ]
+}
