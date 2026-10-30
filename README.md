@@ -52,77 +52,11 @@ the curated evidence pack in `evidence_pack/`.
 
 ## Quickstart & Evaluation Modes
 
-BARRED offers two ways to evaluate the system:
-
-### Option A: 30-Second Instant Visual Demo (Offline Replay)
+### Run the Demo (Offline Replay)
 Inspect the three canonical outcomes without needing a 20GB+ GPU running:
 ```bash
 uv run python cli.py demo --offline
 ```
-
----
-
-### Option B: Full Live Multi-Agent Pipeline (Real Meta Muse-Glimmer-30B)
-
-This runs the complete end-to-end multi-agent debate and deterministic evidence gating pipeline.
-
-#### Terminal 1 — Download & Launch Mirai Model:
-```bash
-brew install mirai
-mirai --model trymirai/Muse-Glimmer-30B-M
-```
-
-#### Terminal 2 — Start Uzu OpenAI-Compatible Proxy (Python 3.12):
-```bash
-# If .venv-uzu is not already initialized:
-# uv venv .venv-uzu --python 3.12 && uv pip install --python .venv-uzu/bin/python uzu uvicorn fastapi
-MODEL=trymirai/Muse-Glimmer-30B-M ./scripts/start_uzu_proxy.sh
-```
-
-#### Terminal 3 — Launch the Multi-Agent Debate Stack:
-Spins up the Pro debater, Con debater, Verifier, and Judge microservices:
-```bash
-./scenarios/debate/start_all_muse_stack.sh
-```
-
-#### Terminal 4 — Execute the Evidence-Gated Batch Review:
-```bash
-uv run python scenarios/debate/run_batch.py \
-  --seeds scenarios/debate/cve_seeds_specific_anchor_10.jsonl \
-  --run-id m9bol-gate-smoke-v10 \
-  --output artifacts/factorial/corpus_gateol_smoke_v10.jsonl \
-  --gepa-dir artifacts/gepa_m9dl_pareto_smoke \
-  --attempts-out artifacts/attempts/gateol-smoke-v10.jsonl \
-  --manifest-out artifacts/runs/gateol-smoke-v10/batch_manifest.json \
-  --seed 42 --mode record --slice-judge --reflector --reflector-in-process \
-  --reflector-mode symmetric --escalate-pareto --max-concurrency 1 \
-  --counter-evidence-validation-mode enforce_deterministic --halt-on-con-win
-```
-
-#### Inspect Live Run Results via CLI:
-Render the human-readable tri-state decision cards directly from the live attempt logs:
-```bash
-uv run python cli.py inspect evidence_pack/m9bol_gate_smoke_v10_attempts.jsonl
-```
-
-#### Evaluate Benchmark Ground Truth & Confusion Matrix:
-Evaluate any batch attempt log against the canonical ground-truth ledger ([`reports/BARRED_Track_1_Canonical_Ledger.csv`](reports/BARRED_Track_1_Canonical_Ledger.csv)) to render the 2x2 confusion matrix and epistemic boundary metrics:
-```bash
-uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts.jsonl
-```
-
----
-
-## Detailed Explanation of Pipeline Flags
-
-| Flag | Purpose & Impact |
-| :--- | :--- |
-| `--seeds cve_seeds_specific_anchor_10.jsonl` | Loads benchmark seeds including Seed 90 (gdImageJpegPtr, unsupported wrapper). The safe_copy case is a synthetic fixture (see `fixtures/`). |
-| `--counter-evidence-validation-mode enforce_deterministic` | **The Core Innovation**: Engages the AST evidence gate. Blocks any model claim lacking an invariant proof. |
-| `--halt-on-con-win` | **Efficiency & Proof**: Halts execution the instant deterministic proof is confirmed (safe_copy halts on Round 0). |
-| `--slice-judge` | Slices code context specifically for judge adjudication, stripping misleading context. |
-| `--reflector --reflector-mode symmetric --escalate-pareto` | **Multi-Turn Epistemic Escalation**: When the gate catches a hallucination in Round 0 (Seed 90), reflection forces the model to re-evaluate and admit `unresolved` in Round 1. |
-| `--mode record` | Records bit-for-bit LLM prompt/response cassettes and attempt telemetry for auditability. |
 
 ---
 
