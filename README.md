@@ -35,6 +35,21 @@ The result is a clean tri-state security review:
 
 ---
 
+## Setup (Bootstrap)
+
+This repository contains only the hackathon event code. The pre-event foundation
+(`inert-silver` at commit `7218e2d`) is fetched at setup time:
+
+```bash
+./bootstrap.sh
+```
+
+This clones the foundation, applies the event patches, and installs dependencies.
+After bootstrap, the full pipeline is available under `foundation/`.
+
+The offline demo (`cli demo --offline`) works without the foundation — it uses
+the curated evidence pack in `evidence_pack/`.
+
 ## Quickstart & Evaluation Modes
 
 BARRED offers two ways to evaluate the system:
