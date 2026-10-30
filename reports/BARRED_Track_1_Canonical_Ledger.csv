@@ -1,0 +1,51 @@
+seed,raw_status,verdict,defense_obligation
+42,proved_safe_normal_linux_3_18_vfs_path,proved_safe,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
+43,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
+44,confirmed_vulnerable_timing_side_channel,confirmed_vulnerable,
+45,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+46,proved_safe_libxml2_mem_parser_size_guard,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+47,proved_safe_posix_acl_from_xattr_allocates_own_acl,proved_safe,
+48,triage_likely_invalid,ambiguous,
+49,context_deficient_unresolved_createwbmp_overflow,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+50,proved_safe_percent_decode_bounds_claim,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+51,proved_safe_rename_does_not_dereference_symlink,proved_safe,
+52,proved_safe_vcc_setsockopt_optlen_validated,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+53,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+54,triage_context_deficient,context_deficient,
+55,confirmed_vulnerable_unchecked_data_len,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+56,context_deficient_gss_handle_reachability_unproven,context_deficient,
+57,proved_safe_big_key_path_nullified_after_put,proved_safe,
+58,triage_ambiguous,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+59,triage_likely_invalid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+60,context_deficient_unresolved_gss_handle_validation,context_deficient,
+61,confirmed_vulnerable_zlib_drv_size_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+62,proved_safe_sock_diag_mutex_held_across_dump,proved_safe,
+63,triage_likely_valid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+64,triage_likely_invalid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+65,triage_likely_valid,ambiguous,
+66,proved_safe_crypto_rng_synchronous_seed_contract,proved_safe,
+67,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+68,proved_safe_isofs_export_parent_offset_bound,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+69,confirmed_vulnerable_sasl_credential_aliasing,confirmed_vulnerable,
+70,context_deficient_unresolved_perl_runtime_contract,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+71,confirmed_vulnerable_chm_zip_slip_path_traversal,confirmed_vulnerable,
+72,proved_safe_nghttp2_user_recv_ext_types_32_byte_bitmask,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+73,confirmed_vulnerable_udf_pc_to_char_oob_write,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+74,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
+75,confirmed_vulnerable_abrt_dump_dir_path_injection,confirmed_vulnerable,
+76,triage_likely_valid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+77,triage_context_deficient,context_deficient,
+78,confirmed_vulnerable_stack_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+79,confirmed_vulnerable_process_tree_null_deref,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
+80,confirmed_vulnerable_ras_length_integer_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+81,triage_likely_valid,ambiguous,
+82,triage_context_deficient,context_deficient,
+83,triage_likely_invalid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+84,triage_ambiguous,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+85,confirmed_vulnerable_abrt_toctou_privilege_escalation,confirmed_vulnerable,
+86,proved_safe_lua_extra_stack_guarantee,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+87,triage_likely_valid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+88,triage_likely_valid,ambiguous,
+89,triage_context_deficient,context_deficient,
+90,proved_safe_gd_jpeg_zero_width_bounds,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+91,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""identity_mismatch""}"
