@@ -88,7 +88,7 @@ Spins up the Pro debater, Con debater, Verifier, and Judge microservices:
 #### Terminal 4 — Execute the Evidence-Gated Batch Review:
 ```bash
 uv run python scenarios/debate/run_batch.py \
-  --seeds scenarios/debate/cve_seeds_smoke_2gate.jsonl \
+  --seeds scenarios/debate/cve_seeds_specific_anchor_10.jsonl \
   --run-id m9bol-gate-smoke-v10 \
   --output artifacts/factorial/corpus_gateol_smoke_v10.jsonl \
   --gepa-dir artifacts/gepa_m9dl_pareto_smoke \
@@ -102,7 +102,7 @@ uv run python scenarios/debate/run_batch.py \
 #### Inspect Live Run Results via CLI:
 Render the human-readable tri-state decision cards directly from the live attempt logs:
 ```bash
-uv run python cli.py inspect artifacts/attempts/gateol-smoke-v10.jsonl
+uv run python cli.py inspect evidence_pack/m9bol_gate_smoke_v10_attempts.jsonl
 ```
 
 #### Evaluate Benchmark Ground Truth & Confusion Matrix:
@@ -117,7 +117,7 @@ uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts
 
 | Flag | Purpose & Impact |
 | :--- | :--- |
-| `--seeds cve_seeds_smoke_2gate.jsonl` | Loads the two test cases: safe_copy (synthetic, supported memcpy guard) and Seed 90 (gdImageJpegPtr, unsupported wrapper). |
+| `--seeds cve_seeds_specific_anchor_10.jsonl` | Loads benchmark seeds including Seed 90 (gdImageJpegPtr, unsupported wrapper). The safe_copy case is a synthetic fixture (see `fixtures/`). |
 | `--counter-evidence-validation-mode enforce_deterministic` | **The Core Innovation**: Engages the AST evidence gate. Blocks any model claim lacking an invariant proof. |
 | `--halt-on-con-win` | **Efficiency & Proof**: Halts execution the instant deterministic proof is confirmed (safe_copy halts on Round 0). |
 | `--slice-judge` | Slices code context specifically for judge adjudication, stripping misleading context. |
