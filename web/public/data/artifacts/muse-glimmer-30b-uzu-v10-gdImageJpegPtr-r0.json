@@ -1,0 +1,152 @@
+{
+  "decision": "rejected",
+  "reject_reason": "counter_evidence_invalid_contract",
+  "support_level": "supported",
+  "judge_eval": {
+    "outcome": "con_win",
+    "con_candidate_id": "C1",
+    "winner": "con_debater",
+    "support_level": "supported",
+    "anchors": [
+      "src->sx = 0",
+      "if (src->sx > 0) { gdImageJpegPtr(...) }",
+      "dst = NULL"
+    ]
+  },
+  "counter_evidence_validation": {
+    "status": "invalid_contract",
+    "method": "structural_v1",
+    "failure_reasons": [
+      "counter_evidence_missing"
+    ],
+    "checks": {},
+    "defense_kind": null,
+    "evidence": {}
+  },
+  "soft_checks": {
+    "mechanism_evidence": {
+      "has_code_token": true,
+      "has_operation_anchor": true,
+      "matched_code_tokens": [
+        "dst",
+        "gdImageJpegPtr",
+        "NULL",
+        "else",
+        "src"
+      ],
+      "operation_anchor_hits": [
+        "src->sx = 0",
+        "dst = NULL"
+      ],
+      "operation_anchor_span_hits": [],
+      "operation_anchor_token_overlap_hits": [],
+      "pass": true
+    },
+    "mechanism_grounding": {
+      "hits": [
+        "src->sx = 0",
+        "dst = NULL"
+      ],
+      "pass": true
+    },
+    "mechanism_template": {
+      "anchor_hits_in_mechanism": 2,
+      "missing": [],
+      "pass": true
+    },
+    "predicate_aboutness": {
+      "candidates": [
+        "gdImageJpegPtr",
+        "sx",
+        "access",
+        "image",
+        "width",
+        "artificially",
+        "set",
+        "zero"
+      ],
+      "hits": [
+        "gdImageJpegPtr",
+        "sx"
+      ],
+      "pass": true
+    },
+    "predicate_quality": {
+      "has_code_symbol": true,
+      "has_vulnerability_class": true,
+      "length": 129,
+      "pass": true,
+      "reasons": [],
+      "symbol_hits": [
+        "gdImageJpegPtr",
+        "sx"
+      ]
+    }
+  },
+  "anchors_normalized": [],
+  "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+  "refinement_round": 0,
+  "llm_usage": {
+    "totals": {
+      "avg_duration_ms": 113682.672,
+      "calls": 4,
+      "completion_tokens": 5431,
+      "cost_usd": 0.0,
+      "max_duration_ms": 159625.296,
+      "min_duration_ms": 62826.261,
+      "missing_usage_calls": 0,
+      "p95_duration_ms": 159625.296,
+      "prompt_tokens": 8462,
+      "total_duration_ms": 454730.69,
+      "total_tokens": 13893
+    },
+    "by_stage": {
+      "generator_boundary": {
+        "avg_duration_ms": 116139.567,
+        "calls": 2,
+        "completion_tokens": 3140,
+        "cost_usd": 0.0,
+        "max_duration_ms": 139272.858,
+        "prompt_tokens": 1390,
+        "total_duration_ms": 232279.133,
+        "total_tokens": 4530
+      },
+      "judge_adjudication": {
+        "avg_duration_ms": 111225.779,
+        "calls": 2,
+        "completion_tokens": 2291,
+        "cost_usd": 0.0,
+        "max_duration_ms": 159625.296,
+        "prompt_tokens": 7072,
+        "total_duration_ms": 222451.557,
+        "total_tokens": 9363
+      }
+    }
+  },
+  "metadata": {
+    "seed": 43,
+    "clock_now": "2026-10-28T10:34:00Z",
+    "models": {
+      "debater": "openai/trymirai/Muse-Glimmer-30B-M",
+      "generator": "openai/trymirai/Muse-Glimmer-30B-M",
+      "judge": "openai/trymirai/Muse-Glimmer-30B-M",
+      "verifier": "openai/trymirai/Muse-Glimmer-30B-M"
+    },
+    "generation_config": {
+      "default": {
+        "max_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95
+      },
+      "model_overrides": {
+        "gemma4": {
+          "temperature": 1.0,
+          "top_k": 64,
+          "top_p": 0.95
+        }
+      },
+      "sampling_profile": "ollama_gemma4"
+    },
+    "sample_sha256": null
+  }
+}

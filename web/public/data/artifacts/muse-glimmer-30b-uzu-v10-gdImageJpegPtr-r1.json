@@ -1,0 +1,180 @@
+{
+  "decision": "rejected",
+  "reject_reason": "unresolved_no_valid_receipt",
+  "support_level": "supported",
+  "judge_eval": {
+    "outcome": "unresolved",
+    "con_candidate_id": null,
+    "winner": null,
+    "support_level": "supported",
+    "anchors": [
+      "src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */",
+      "dst = gdImageJpegPtr(src, &size, 0);",
+      "gdTestAssert(dst == NULL);"
+    ]
+  },
+  "counter_evidence_validation": null,
+  "soft_checks": {
+    "mechanism_evidence": {
+      "has_code_token": true,
+      "has_operation_anchor": true,
+      "matched_code_tokens": [
+        "NULL",
+        "dst",
+        "Test",
+        "size",
+        "gdImageJpegPtr",
+        "com",
+        "gdTestAssert",
+        "src"
+      ],
+      "operation_anchor_hits": [],
+      "operation_anchor_span_hits": [],
+      "operation_anchor_token_overlap_hits": [
+        {
+          "anchor": "src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */",
+          "overlap_tokens": [
+            "gdImageJpegPtr",
+            "src",
+            "sx"
+          ]
+        },
+        {
+          "anchor": "dst = gdImageJpegPtr(src, &size, 0);",
+          "overlap_tokens": [
+            "dst",
+            "gdImageJpegPtr",
+            "size",
+            "src"
+          ]
+        },
+        {
+          "anchor": "gdTestAssert(dst == NULL);",
+          "overlap_tokens": [
+            "NULL",
+            "dst",
+            "gdTestAssert"
+          ]
+        }
+      ],
+      "pass": true
+    },
+    "mechanism_grounding": {
+      "hits": [],
+      "pass": false
+    },
+    "mechanism_template": {
+      "anchor_hits_in_mechanism": 0,
+      "has_guard_label": false,
+      "has_sink_label": false,
+      "has_source_label": false,
+      "pass": false
+    },
+    "predicate_aboutness": {
+      "candidates": [
+        "gdImageJpegPtr",
+        "sx",
+        "access",
+        "image",
+        "width",
+        "artificially",
+        "set",
+        "zero"
+      ],
+      "hits": [
+        "gdImageJpegPtr",
+        "sx",
+        "image",
+        "width",
+        "set",
+        "zero"
+      ],
+      "pass": true
+    },
+    "predicate_quality": {
+      "has_code_symbol": true,
+      "has_vulnerability_class": true,
+      "length": 129,
+      "pass": true,
+      "reasons": [],
+      "symbol_hits": [
+        "gdImageJpegPtr",
+        "sx",
+        "image",
+        "width",
+        "set",
+        "zero"
+      ]
+    }
+  },
+  "anchors_normalized": [
+    "src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */",
+    "dst = gdImageJpegPtr(src, &size, 0);",
+    "gdTestAssert(dst == NULL);"
+  ],
+  "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+  "refinement_round": 1,
+  "llm_usage": {
+    "totals": {
+      "avg_duration_ms": 180326.026,
+      "calls": 3,
+      "completion_tokens": 7171,
+      "cost_usd": 0.0,
+      "max_duration_ms": 286877.367,
+      "min_duration_ms": 91890.288,
+      "missing_usage_calls": 0,
+      "p95_duration_ms": 286877.367,
+      "prompt_tokens": 5621,
+      "total_duration_ms": 540978.079,
+      "total_tokens": 12792
+    },
+    "by_stage": {
+      "generator_refine": {
+        "avg_duration_ms": 189383.828,
+        "calls": 2,
+        "completion_tokens": 5383,
+        "cost_usd": 0.0,
+        "max_duration_ms": 286877.367,
+        "prompt_tokens": 1324,
+        "total_duration_ms": 378767.655,
+        "total_tokens": 6707
+      },
+      "judge_adjudication": {
+        "avg_duration_ms": 162210.424,
+        "calls": 1,
+        "completion_tokens": 1788,
+        "cost_usd": 0.0,
+        "max_duration_ms": 162210.424,
+        "prompt_tokens": 4297,
+        "total_duration_ms": 162210.424,
+        "total_tokens": 6085
+      }
+    }
+  },
+  "metadata": {
+    "seed": 43,
+    "clock_now": "2026-10-28T10:34:00Z",
+    "models": {
+      "debater": "openai/trymirai/Muse-Glimmer-30B-M",
+      "generator": "openai/trymirai/Muse-Glimmer-30B-M",
+      "judge": "openai/trymirai/Muse-Glimmer-30B-M",
+      "verifier": "openai/trymirai/Muse-Glimmer-30B-M"
+    },
+    "generation_config": {
+      "default": {
+        "max_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95
+      },
+      "model_overrides": {
+        "gemma4": {
+          "temperature": 1.0,
+          "top_k": 64,
+          "top_p": 0.95
+        }
+      },
+      "sampling_profile": "ollama_gemma4"
+    },
+    "sample_sha256": null
+  }
+}

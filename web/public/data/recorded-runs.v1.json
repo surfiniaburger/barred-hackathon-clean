@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-31T00:00:00Z",
+  "disclosure": {
+    "mode": "recorded_live_artifacts",
+    "live_inference_available": false
+  },
+  "runs": [
+    {
+      "id": "muse-glimmer-30b-uzu-v10",
+      "label": "Muse-Glimmer-30B \u00b7 Uzu",
+      "provider": "Uzu local OpenAI-compatible proxy",
+      "recorded_at": "2026-10-28T10:34:00Z",
+      "source_manifest": "evidence_pack/batch_manifest.json",
+      "model": "openai/trymirai/Muse-Glimmer-30B-M",
+      "sampling": {
+        "temperature": 1.0,
+        "max_tokens": 4096
+      },
+      "cases": [
+        {
+          "id": "muse-glimmer-30b-uzu-v10-safe_copy-r0",
+          "scenario_id": "safe_copy",
+          "round": 0,
+          "status": "PASS",
+          "model_outcome": "con_win",
+          "candidate_id": "C1",
+          "reason_code": null,
+          "gate_status": "deterministically_confirmed",
+          "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+          "source_code": "void safe_copy(char *dst, const char *src, int len, int cap) {\n    if (len > cap) {\n        return;\n    }\n    memcpy(dst, src, len);\n}\n",
+          "anchors": [
+            "if (len >= cap)",
+            "memcpy(dst, src, len)",
+            "if (len >= cap) {\n        return;\n    }",
+            "if (len >= cap) {"
+          ],
+          "events": [
+            {
+              "stage": "generator_boundary",
+              "recorded_duration_ms": 114213.408,
+              "total_tokens": 2055,
+              "calls": 1
+            },
+            {
+              "stage": "judge_adjudication",
+              "recorded_duration_ms": 130224.245,
+              "total_tokens": 5797,
+              "calls": 1
+            }
+          ],
+          "checks": {
+            "anchors_are_functional": true,
+            "control_flow_valid": true,
+            "counterfactual_coherent": true,
+            "guard_anchor_exact": true,
+            "operation_anchor_exact": true,
+            "predicate_precondition_blocked": true,
+            "value_relation_valid": true
+          },
+          "failure_reasons": [],
+          "counterfactual": "rejecting_guard_dominates_operation",
+          "artifact_links": {
+            "sanitized_record": "data/artifacts/muse-glimmer-30b-uzu-v10-safe_copy-r0.json"
+          },
+          "timing_ms": 244437.653,
+          "tokens": 7852,
+          "terminal_for_scenario": true
+        },
+        {
+          "id": "muse-glimmer-30b-uzu-v10-gdImageJpegPtr-r0",
+          "scenario_id": "gdImageJpegPtr",
+          "round": 0,
+          "status": "BLOCKED",
+          "model_outcome": "con_win",
+          "candidate_id": "C1",
+          "reason_code": "counter_evidence_invalid_contract",
+          "gate_status": "invalid_contract",
+          "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+          "source_code": "/**\n\n * Test that failure to convert to JPEG returns NULL\n\n *\n\n * We are creating an image, set its width to zero, and pass this image to\n\n * `gdImageJpegPtr()` which is supposed to fail, and as such should return NULL.\n\n *\n\n * See also <https://github.com/libgd/libgd/issues/381>\n\n */\n\n\n\n\n\n#include \"gd.h\"\n\n#include \"gdtest.h\"\n\n\n\n\n\nint main()\n\n{\n\n    gdImagePtr src, dst;\n\n    int size;\n\n\n\n    src = gdImageCreateTrueColor(1, 10);\n\n    gdTestAssert(src != NULL);\n\n\n\n    src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */\n\n\n\n    dst = gdImageJpegPtr(src, &size, 0);\n\n    gdTestAssert(dst == NULL);\n\n\n\n    gdImageDestroy(src);\n\n\n\n    return gdNumFailures();\n\n}\n",
+          "anchors": [
+            "src->sx = 0",
+            "if (src->sx > 0) { gdImageJpegPtr(...) }",
+            "dst = NULL"
+          ],
+          "events": [
+            {
+              "stage": "generator_boundary",
+              "recorded_duration_ms": 232279.133,
+              "total_tokens": 4530,
+              "calls": 2
+            },
+            {
+              "stage": "judge_adjudication",
+              "recorded_duration_ms": 222451.557,
+              "total_tokens": 9363,
+              "calls": 2
+            }
+          ],
+          "checks": {},
+          "failure_reasons": [
+            "counter_evidence_missing"
+          ],
+          "counterfactual": null,
+          "artifact_links": {
+            "sanitized_record": "data/artifacts/muse-glimmer-30b-uzu-v10-gdImageJpegPtr-r0.json"
+          },
+          "timing_ms": 454730.69,
+          "tokens": 13893,
+          "terminal_for_scenario": false
+        },
+        {
+          "id": "muse-glimmer-30b-uzu-v10-gdImageJpegPtr-r1",
+          "scenario_id": "gdImageJpegPtr",
+          "round": 1,
+          "status": "UNRESOLVED",
+          "model_outcome": "unresolved",
+          "candidate_id": null,
+          "reason_code": "unresolved_no_valid_receipt",
+          "gate_status": null,
+          "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+          "source_code": "/**\n\n * Test that failure to convert to JPEG returns NULL\n\n *\n\n * We are creating an image, set its width to zero, and pass this image to\n\n * `gdImageJpegPtr()` which is supposed to fail, and as such should return NULL.\n\n *\n\n * See also <https://github.com/libgd/libgd/issues/381>\n\n */\n\n\n\n\n\n#include \"gd.h\"\n\n#include \"gdtest.h\"\n\n\n\n\n\nint main()\n\n{\n\n    gdImagePtr src, dst;\n\n    int size;\n\n\n\n    src = gdImageCreateTrueColor(1, 10);\n\n    gdTestAssert(src != NULL);\n\n\n\n    src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */\n\n\n\n    dst = gdImageJpegPtr(src, &size, 0);\n\n    gdTestAssert(dst == NULL);\n\n\n\n    gdImageDestroy(src);\n\n\n\n    return gdNumFailures();\n\n}\n",
+          "anchors": [
+            "src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */",
+            "dst = gdImageJpegPtr(src, &size, 0);",
+            "gdTestAssert(dst == NULL);"
+          ],
+          "events": [
+            {
+              "stage": "generator_refine",
+              "recorded_duration_ms": 378767.655,
+              "total_tokens": 6707,
+              "calls": 2
+            },
+            {
+              "stage": "judge_adjudication",
+              "recorded_duration_ms": 162210.424,
+              "total_tokens": 6085,
+              "calls": 1
+            }
+          ],
+          "checks": {},
+          "failure_reasons": [],
+          "counterfactual": null,
+          "artifact_links": {
+            "sanitized_record": "data/artifacts/muse-glimmer-30b-uzu-v10-gdImageJpegPtr-r1.json"
+          },
+          "timing_ms": 540978.079,
+          "tokens": 12792,
+          "terminal_for_scenario": true
+        }
+      ]
+    },
+    {
+      "id": "muse-spark-open-baseten-v13",
+      "label": "Muse Spark Open \u00b7 Baseten",
+      "provider": "Baseten hosted inference",
+      "recorded_at": "2026-10-30T10:17:35Z",
+      "source_manifest": "artifacts/runs/gateol-smoke-v13/batch_manifest.json",
+      "model": "openai/meta-models/muse-spark-open-1026",
+      "sampling": {
+        "temperature": 1.0,
+        "max_tokens": 4096
+      },
+      "cases": [
+        {
+          "id": "muse-spark-open-baseten-v13-safe_copy-r0",
+          "scenario_id": "safe_copy",
+          "round": 0,
+          "status": "PASS",
+          "model_outcome": "con_win",
+          "candidate_id": "C1",
+          "reason_code": null,
+          "gate_status": "deterministically_confirmed",
+          "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+          "source_code": "void safe_copy(char *dst, const char *src, int len, int cap) {\n    if (len > cap) {\n        return;\n    }\n    memcpy(dst, src, len);\n}\n",
+          "anchors": [
+            "if (len > cap) return;",
+            "memcpy(dst, src, len);",
+            "if (len < 0 || cap < 0) return;",
+            "memcpy(dst, src, len)"
+          ],
+          "events": [
+            {
+              "stage": "generator_boundary",
+              "recorded_duration_ms": 7411.81,
+              "total_tokens": 2381,
+              "calls": 1
+            },
+            {
+              "stage": "judge_adjudication",
+              "recorded_duration_ms": 4853.448,
+              "total_tokens": 8439,
+              "calls": 1
+            }
+          ],
+          "checks": {
+            "anchors_are_functional": true,
+            "control_flow_valid": true,
+            "counterfactual_coherent": true,
+            "guard_anchor_exact": true,
+            "operation_anchor_exact": true,
+            "predicate_precondition_blocked": true,
+            "value_relation_valid": true
+          },
+          "failure_reasons": [],
+          "counterfactual": "rejecting_guard_dominates_operation",
+          "artifact_links": {
+            "sanitized_record": "data/artifacts/muse-spark-open-baseten-v13-safe_copy-r0.json"
+          },
+          "timing_ms": 12265.258,
+          "tokens": 10820,
+          "terminal_for_scenario": true
+        },
+        {
+          "id": "muse-spark-open-baseten-v13-gdImageJpegPtr-r0",
+          "scenario_id": "gdImageJpegPtr",
+          "round": 0,
+          "status": "UNRESOLVED",
+          "model_outcome": "unresolved",
+          "candidate_id": null,
+          "reason_code": "unresolved_no_valid_receipt",
+          "gate_status": null,
+          "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+          "source_code": "/**\n\n * Test that failure to convert to JPEG returns NULL\n\n *\n\n * We are creating an image, set its width to zero, and pass this image to\n\n * `gdImageJpegPtr()` which is supposed to fail, and as such should return NULL.\n\n *\n\n * See also <https://github.com/libgd/libgd/issues/381>\n\n */\n\n\n\n\n\n#include \"gd.h\"\n\n#include \"gdtest.h\"\n\n\n\n\n\nint main()\n\n{\n\n    gdImagePtr src, dst;\n\n    int size;\n\n\n\n    src = gdImageCreateTrueColor(1, 10);\n\n    gdTestAssert(src != NULL);\n\n\n\n    src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */\n\n\n\n    dst = gdImageJpegPtr(src, &size, 0);\n\n    gdTestAssert(dst == NULL);\n\n\n\n    gdImageDestroy(src);\n\n\n\n    return gdNumFailures();\n\n}\n",
+          "anchors": [
+            "if (src->sx <= 0 || src->sy <= 0) {",
+            "dst = gdImageJpegPtr(src, &size, 0);",
+            "src->sx = 0; /* boundary: force invalid width */",
+            "dst = NULL;"
+          ],
+          "events": [
+            {
+              "stage": "generator_boundary",
+              "recorded_duration_ms": 4020.254,
+              "total_tokens": 1908,
+              "calls": 1
+            },
+            {
+              "stage": "judge_adjudication",
+              "recorded_duration_ms": 5366.682,
+              "total_tokens": 10678,
+              "calls": 1
+            }
+          ],
+          "checks": {},
+          "failure_reasons": [],
+          "counterfactual": null,
+          "artifact_links": {
+            "sanitized_record": "data/artifacts/muse-spark-open-baseten-v13-gdImageJpegPtr-r0.json"
+          },
+          "timing_ms": 9386.936,
+          "tokens": 12586,
+          "terminal_for_scenario": false
+        },
+        {
+          "id": "muse-spark-open-baseten-v13-gdImageJpegPtr-r1",
+          "scenario_id": "gdImageJpegPtr",
+          "round": 1,
+          "status": "UNRESOLVED",
+          "model_outcome": "unresolved",
+          "candidate_id": null,
+          "reason_code": "unresolved_no_valid_receipt",
+          "gate_status": null,
+          "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+          "source_code": "/**\n\n * Test that failure to convert to JPEG returns NULL\n\n *\n\n * We are creating an image, set its width to zero, and pass this image to\n\n * `gdImageJpegPtr()` which is supposed to fail, and as such should return NULL.\n\n *\n\n * See also <https://github.com/libgd/libgd/issues/381>\n\n */\n\n\n\n\n\n#include \"gd.h\"\n\n#include \"gdtest.h\"\n\n\n\n\n\nint main()\n\n{\n\n    gdImagePtr src, dst;\n\n    int size;\n\n\n\n    src = gdImageCreateTrueColor(1, 10);\n\n    gdTestAssert(src != NULL);\n\n\n\n    src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */\n\n\n\n    dst = gdImageJpegPtr(src, &size, 0);\n\n    gdTestAssert(dst == NULL);\n\n\n\n    gdImageDestroy(src);\n\n\n\n    return gdNumFailures();\n\n}\n",
+          "anchors": [
+            "if (im->sx <= 0 || im->sy <= 0) return 0;",
+            "if (!validImage(src)) {",
+            "dst = gdImageJpegPtr(src, &size, 0);",
+            "src->sx = 0; /* boundary: force invalid width */"
+          ],
+          "events": [
+            {
+              "stage": "generator_refine",
+              "recorded_duration_ms": 4742.447,
+              "total_tokens": 2248,
+              "calls": 1
+            },
+            {
+              "stage": "judge_adjudication",
+              "recorded_duration_ms": 6034.814,
+              "total_tokens": 9833,
+              "calls": 1
+            }
+          ],
+          "checks": {},
+          "failure_reasons": [],
+          "counterfactual": null,
+          "artifact_links": {
+            "sanitized_record": "data/artifacts/muse-spark-open-baseten-v13-gdImageJpegPtr-r1.json"
+          },
+          "timing_ms": 10777.261,
+          "tokens": 12081,
+          "terminal_for_scenario": true
+        }
+      ]
+    }
+  ]
+}

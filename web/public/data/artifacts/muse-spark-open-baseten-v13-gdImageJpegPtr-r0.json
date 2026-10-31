@@ -1,0 +1,182 @@
+{
+  "decision": "rejected",
+  "reject_reason": "unresolved_no_valid_receipt",
+  "support_level": "supported",
+  "judge_eval": {
+    "outcome": "unresolved",
+    "con_candidate_id": null,
+    "winner": null,
+    "support_level": "supported",
+    "anchors": [
+      "if (src->sx <= 0 || src->sy <= 0) {",
+      "dst = gdImageJpegPtr(src, &size, 0);",
+      "src->sx = 0; /* boundary: force invalid width */",
+      "dst = NULL;"
+    ]
+  },
+  "counter_evidence_validation": null,
+  "soft_checks": {
+    "mechanism_evidence": {
+      "has_code_token": true,
+      "has_operation_anchor": true,
+      "matched_code_tokens": [
+        "NULL",
+        "else",
+        "invariant",
+        "width",
+        "src",
+        "dst",
+        "gdImageJpegPtr"
+      ],
+      "operation_anchor_hits": [],
+      "operation_anchor_span_hits": [],
+      "operation_anchor_token_overlap_hits": [
+        {
+          "anchor": "if (src->sx <= 0 || src->sy <= 0) {",
+          "overlap_tokens": [
+            "if",
+            "src",
+            "sx",
+            "sy"
+          ]
+        },
+        {
+          "anchor": "dst = gdImageJpegPtr(src, &size, 0);",
+          "overlap_tokens": [
+            "dst",
+            "gdImageJpegPtr",
+            "src"
+          ]
+        },
+        {
+          "anchor": "src->sx = 0; /* boundary: force invalid width */",
+          "overlap_tokens": [
+            "src",
+            "sx",
+            "width"
+          ]
+        },
+        {
+          "anchor": "dst = NULL;",
+          "overlap_tokens": [
+            "NULL",
+            "dst"
+          ]
+        }
+      ],
+      "pass": true
+    },
+    "mechanism_grounding": {
+      "hits": [],
+      "pass": false
+    },
+    "mechanism_template": {
+      "anchor_hits_in_mechanism": 0,
+      "has_guard_label": false,
+      "has_sink_label": false,
+      "has_source_label": false,
+      "pass": false
+    },
+    "predicate_aboutness": {
+      "candidates": [
+        "gdImageJpegPtr",
+        "sx",
+        "access",
+        "image",
+        "width",
+        "artificially",
+        "set",
+        "zero"
+      ],
+      "hits": [
+        "gdImageJpegPtr",
+        "sx",
+        "width"
+      ],
+      "pass": true
+    },
+    "predicate_quality": {
+      "has_code_symbol": true,
+      "has_vulnerability_class": true,
+      "length": 129,
+      "pass": true,
+      "reasons": [],
+      "symbol_hits": [
+        "gdImageJpegPtr",
+        "sx",
+        "width"
+      ]
+    }
+  },
+  "anchors_normalized": [
+    "if (src->sx <= 0 || src->sy <= 0) {",
+    "dst = gdImageJpegPtr(src, &size, 0);",
+    "src->sx = 0; /* boundary: force invalid width */",
+    "dst = NULL;"
+  ],
+  "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+  "refinement_round": 0,
+  "llm_usage": {
+    "totals": {
+      "avg_duration_ms": 4693.468,
+      "calls": 2,
+      "completion_tokens": 2206,
+      "cost_usd": 0.0,
+      "max_duration_ms": 5366.682,
+      "min_duration_ms": 4020.254,
+      "missing_usage_calls": 0,
+      "p95_duration_ms": 5366.682,
+      "prompt_tokens": 10380,
+      "total_duration_ms": 9386.936,
+      "total_tokens": 12586
+    },
+    "by_stage": {
+      "generator_boundary": {
+        "avg_duration_ms": 4020.254,
+        "calls": 1,
+        "completion_tokens": 1053,
+        "cost_usd": 0.0,
+        "max_duration_ms": 4020.254,
+        "prompt_tokens": 855,
+        "total_duration_ms": 4020.254,
+        "total_tokens": 1908
+      },
+      "judge_adjudication": {
+        "avg_duration_ms": 5366.682,
+        "calls": 1,
+        "completion_tokens": 1153,
+        "cost_usd": 0.0,
+        "max_duration_ms": 5366.682,
+        "prompt_tokens": 9525,
+        "total_duration_ms": 5366.682,
+        "total_tokens": 10678
+      }
+    }
+  },
+  "metadata": {
+    "seed": 43,
+    "clock_now": "2026-10-30T13:28:20Z",
+    "models": {
+      "debater": "openai/meta-models/muse-spark-open-1026",
+      "generator": "openai/meta-models/muse-spark-open-1026",
+      "judge": "openai/meta-models/muse-spark-open-1026",
+      "verifier": "openai/meta-models/muse-spark-open-1026"
+    },
+    "generation_config": {
+      "default": {
+        "max_tokens": 8192,
+        "temperature": 1.0,
+        "top_p": 0.95
+      },
+      "model_overrides": {
+        "gemma4": {
+          "temperature": 1.0,
+          "top_k": 64,
+          "top_p": 0.95
+        }
+      },
+      "sampling_profile": "ollama_gemma4"
+    },
+    "sample_sha256": null
+  }
+}

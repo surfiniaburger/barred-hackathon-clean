@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BARRED — Recorded Run Explorer</title>
+<style>
+:root { --bg:#0b0f14; --panel:#131922; --panel-2:#1a2230; --border:#2a3444; --text:#e6edf3; --muted:#8b98a5; --accent:#58a6ff; --green:#3fb950; --red:#f85149; --yellow:#d29922; --gray:#6e7681; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+.wrap { max-width:1100px; margin:0 auto; padding:20px; }
+.banner { background:rgba(210,153,34,.12); border:1px solid var(--yellow); border-radius:8px; padding:10px 16px; margin-bottom:16px; font-size:13px; color:var(--yellow); text-align:center; font-weight:600; }
+h1 { color:var(--accent); margin:0 0 2px; font-size:24px; }
+.sub { color:var(--muted); font-size:13px; margin-bottom:16px; }
+
+/* Verdict rail */
+.verdict-rail { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.vcard { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px; text-align:center; cursor:pointer; transition:border-color .2s; }
+.vcard:hover { border-color:var(--accent); }
+.vcard .label { font-size:13px; font-weight:800; letter-spacing:.5px; margin-bottom:4px; }
+.vcard .desc { font-size:11px; color:var(--muted); }
+.vcard.pass .label { color:var(--green); }
+.vcard.blocked .label { color:var(--red); }
+.vcard.unresolved .label { color:var(--yellow); }
+
+/* Run selector */
+.run-selector { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+.run-card { background:var(--panel); border:2px solid var(--border); border-radius:8px; padding:14px; cursor:pointer; transition:border-color .2s; }
+.run-card:hover, .run-card.active { border-color:var(--accent); }
+.run-card .name { font-weight:700; font-size:15px; margin-bottom:2px; }
+.run-card .meta { font-size:12px; color:var(--muted); }
+.run-card .stat { font-size:11px; color:var(--accent); margin-top:4px; }
+
+/* Main layout */
+.main { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media(max-width:800px){ .main{grid-template-columns:1fr;} .verdict-rail{grid-template-columns:1fr;} .run-selector{grid-template-columns:1fr;} }
+
+/* Timeline */
+.panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; }
+.panel h2 { margin:0 0 12px; font-size:15px; color:var(--accent); }
+.scenario-tabs { display:flex; gap:8px; margin-bottom:12px; }
+.scenario-tab { padding:6px 14px; border-radius:6px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); cursor:pointer; font-size:13px; font-weight:600; }
+.scenario-tab.active { background:var(--accent); color:#0b0f14; border-color:var(--accent); }
+.round-tabs { display:flex; gap:6px; margin-bottom:12px; }
+.round-tab { padding:4px 12px; border-radius:4px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); cursor:pointer; font-size:12px; }
+.round-tab.active { background:var(--accent); color:#0b0f14; border-color:var(--accent); }
+
+.timeline { margin:12px 0; }
+.step { display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); opacity:0; transition:opacity .3s; }
+.step.visible { opacity:1; }
+.step .time { font-family:monospace; font-size:12px; color:var(--accent); min-width:60px; }
+.step .label { font-size:13px; }
+.step .dur { font-size:11px; color:var(--muted); }
+
+.controls { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
+.ctrl-btn { padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); cursor:pointer; font-size:12px; font-weight:600; }
+.ctrl-btn:hover { border-color:var(--accent); }
+.playback-mode { display:flex; gap:4px; }
+.playback-mode button { padding:4px 10px; border-radius:4px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); cursor:pointer; font-size:11px; }
+.playback-mode button.active { background:var(--accent); color:#0b0f14; border-color:var(--accent); }
+
+.outcome-badge { display:inline-block; padding:6px 16px; border-radius:6px; font-size:16px; font-weight:800; letter-spacing:.5px; margin:8px 0; }
+.outcome-badge.PASS { background:rgba(63,185,80,.15); color:var(--green); border:1px solid var(--green); }
+.outcome-badge.BLOCKED { background:rgba(248,81,73,.15); color:var(--red); border:1px solid var(--red); }
+.outcome-badge.UNRESOLVED { background:rgba(210,153,34,.15); color:var(--yellow); border:1px solid var(--yellow); }
+
+/* Evidence inspector */
+.inspector { }
+.inspector h3 { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:12px 0 4px; }
+.inspector .trace { font-family:monospace; font-size:12px; background:var(--bg); padding:8px; border-radius:4px; border:1px solid var(--border); word-break:break-word; margin:4px 0; white-space:pre-wrap; }
+.checks { list-style:none; padding:0; margin:4px 0; }
+.checks li { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; font-family:monospace; border-bottom:1px solid var(--border); }
+.ok { color:var(--green); } .fail { color:var(--red); }
+.code-block { font-family:monospace; font-size:12px; background:var(--bg); padding:10px; border-radius:4px; border:1px solid var(--border); white-space:pre; overflow-x:auto; line-height:1.6; }
+.code-block .guard { background:rgba(63,185,80,.2); }
+.code-block .sink { background:rgba(88,166,255,.2); }
+.code-block .claimed { background:rgba(248,81,73,.2); }
+
+.note { color:var(--muted); font-size:11px; margin-top:8px; }
+.comparison { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; margin-top:16px; }
+.comparison h2 { margin:0 0 8px; font-size:15px; color:var(--accent); }
+.comparison p { font-size:12px; color:var(--muted); margin:4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">[RECORDED ARTIFACTS — NO LIVE INFERENCE] This explorer replays archived runs. No model call is made.</div>
+  <h1>BARRED Recorded Run Explorer</h1>
+  <div class="sub">Model claims are candidates. Deterministic evidence decides certification.</div>
+
+  <!-- Verdict rail -->
+  <div class="verdict-rail">
+    <div class="vcard pass" onclick="jumpTo('PASS')">
+      <div class="label">PASS</div>
+      <div class="desc">machine-verified receipt</div>
+    </div>
+    <div class="vcard blocked" onclick="jumpTo('BLOCKED')">
+      <div class="label">BLOCKED</div>
+      <div class="desc">candidate claim rejected by gate</div>
+    </div>
+    <div class="vcard unresolved" onclick="jumpTo('UNRESOLVED')">
+      <div class="label">UNRESOLVED</div>
+      <div class="desc">insufficient supported proof</div>
+    </div>
+  </div>
+
+  <!-- Run selector -->
+  <div class="run-selector" id="runSelector"></div>
+
+  <!-- Main workspace -->
+  <div class="main">
+    <div class="panel">
+      <h2>Timeline &amp; Outcome</h2>
+      <div class="scenario-tabs" id="scenarioTabs"></div>
+      <div class="round-tabs" id="roundTabs"></div>
+      <div class="controls">
+        <button class="ctrl-btn" onclick="playConcise()">Play (concise)</button>
+        <button class="ctrl-btn" onclick="playDetailed()">Play (detailed)</button>
+        <button class="ctrl-btn" onclick="prevStep()">◀ Prev</button>
+        <button class="ctrl-btn" onclick="nextStep()">Next ▶</button>
+        <button class="ctrl-btn" onclick="jumpFinal()">Jump to final</button>
+        <div class="playback-mode">
+          <button id="modeConcise" class="active" onclick="setPlayback('concise')">concise</button>
+          <button id="modeDetailed" onclick="setPlayback('detailed')">detailed</button>
+        </div>
+      </div>
+      <div class="timeline" id="timeline"></div>
+      <div id="outcomeArea"></div>
+      <div class="note" id="playbackNote">Playback is an annotated replay of an archived run.</div>
+    </div>
+
+    <div class="panel inspector">
+      <h2>Evidence Inspector</h2>
+      <div id="inspector"></div>
+    </div>
+  </div>
+
+  <!-- Comparison footer -->
+  <div class="comparison">
+    <h2>Session Comparison</h2>
+    <p>These are separate recorded sessions with different serving environments, sampling, and tracked call counts; timings are trace metadata, not a general benchmark.</p>
+    <p id="comparisonText"></p>
+  </div>
+</div>
+
+<script>
+let catalog = null;
+let currentRun = null;
+let currentScenario = null;
+let currentRound = null;
+let currentCase = null;
+let playbackMode = 'concise';
+let stepIndex = 0;
+let steps = [];
+let playTimer = null;
+
+async function init() {
+  const res = await fetch('data/recorded-runs.v1.json');
+  catalog = await res.json();
+  renderRunSelector();
+  // Default: first run, first scenario, first round
+  selectRun(catalog.runs[0].id);
+}
+
+function renderRunSelector() {
+  const container = document.getElementById('runSelector');
+  container.innerHTML = catalog.runs.map(r => `
+    <div class="run-card" id="run-${r.id}" onclick="selectRun('${r.id}')">
+      <div class="name">${r.label}</div>
+      <div class="meta">${r.provider} · recorded ${r.recorded_at.slice(0,10)}</div>
+      <div class="stat">${r.cases.length} curated scenarios · ${r.sampling.temperature === 1.0 ? 'temp 1.0' : ''}</div>
+    </div>
+  `).join('');
+  updateComparison();
+}
+
+function selectRun(runId) {
+  currentRun = catalog.runs.find(r => r.id === runId);
+  document.querySelectorAll('.run-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('run-' + runId).classList.add('active');
+  // Get unique scenarios
+  const scenarios = [...new Set(currentRun.cases.map(c => c.scenario_id))];
+  currentScenario = scenarios[0];
+  renderScenarioTabs(scenarios);
+  renderRoundTabs();
+  loadCase();
+  updateComparison();
+}
+
+function renderScenarioTabs(scenarios) {
+  const container = document.getElementById('scenarioTabs');
+  container.innerHTML = scenarios.map(s => `
+    <button class="scenario-tab ${s===currentScenario?'active':''}" onclick="selectScenario('${s}')">${s}</button>
+  `).join('');
+}
+
+function selectScenario(s) {
+  currentScenario = s;
+  document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.textContent === s));
+  renderRoundTabs();
+  loadCase();
+}
+
+function renderRoundTabs() {
+  const cases = currentRun.cases.filter(c => c.scenario_id === currentScenario);
+  const container = document.getElementById('roundTabs');
+  container.innerHTML = cases.map(c => `
+    <button class="round-tab ${c.round===currentRound?'active':''}" onclick="selectRound(${c.round})">Round ${c.round}${c.terminal_for_scenario?' (final)':''}</button>
+  `).join('');
+}
+
+function selectRound(r) {
+  currentRound = r;
+  document.querySelectorAll('.round-tab').forEach(t => t.classList.toggle('active', t.textContent.startsWith('Round '+r)));
+  loadCase();
+}
+
+function loadCase() {
+  const cases = currentRun.cases.filter(c => c.scenario_id === currentScenario);
+  if (!currentRound && cases.length) currentRound = cases[0].round;
+  currentCase = cases.find(c => c.round === currentRound) || cases[0];
+  currentRound = currentCase.round;
+  renderRoundTabs();
+  buildSteps();
+  renderInspector();
+  // reset playback
+  stepIndex = 0;
+  steps.forEach(s => s.classList.remove('visible'));
+  document.getElementById('outcomeArea').innerHTML = '';
+}
+
+function buildSteps() {
+  const c = currentCase;
+  const ev = c.events || [];
+  const timeline = document.getElementById('timeline');
+  // Build step list
+  const stepList = [];
+  // Stage steps
+  ev.forEach(e => {
+    stepList.push({ time: (e.recorded_duration_ms/1000).toFixed(1)+'s', label: `${e.stage.replace(/_/g,' ')} · recorded ${(e.recorded_duration_ms/1000).toFixed(3)}s`, dur: e.total_tokens ? e.total_tokens+' tok' : '' });
+  });
+  // Gate step
+  if (c.gate_status) {
+    stepList.push({ time: 'gate', label: `Deterministic gate: ${c.gate_status}`, dur: (c.failure_reasons||[]).join(', ') || 'all checks' });
+  }
+  // Outcome step
+  stepList.push({ time: 'final', label: `Outcome: ${c.status}`, dur: c.terminal_for_scenario ? 'terminal' : '' });
+
+  timeline.innerHTML = stepList.map((s,i) => `
+    <div class="step" id="step-${i}">
+      <div class="time">${s.time}</div>
+      <div class="label">${s.label}</div>
+      <div class="dur">${s.dur}</div>
+    </div>
+  `).join('');
+  steps = Array.from(timeline.querySelectorAll('.step'));
+}
+
+function playConcise() {
+  clearInterval(playTimer);
+  stepIndex = 0;
+  steps.forEach(s => s.classList.remove('visible'));
+  document.getElementById('outcomeArea').innerHTML = '';
+  let i = 0;
+  playTimer = setInterval(() => {
+    if (i < steps.length) {
+      steps[i].classList.add('visible');
+      i++;
+    } else {
+      clearInterval(playTimer);
+      showOutcome();
+    }
+  }, 800);
+}
+
+function playDetailed() {
+  clearInterval(playTimer);
+  stepIndex = 0;
+  steps.forEach(s => s.classList.remove('visible'));
+  document.getElementById('outcomeArea').innerHTML = '';
+  if (steps.length) steps[0].classList.add('visible');
+  stepIndex = 1;
+}
+
+function nextStep() {
+  if (stepIndex < steps.length) {
+    steps[stepIndex].classList.add('visible');
+    stepIndex++;
+    if (stepIndex >= steps.length) showOutcome();
+  }
+}
+
+function prevStep() {
+  if (stepIndex > 0) {
+    stepIndex--;
+    steps[stepIndex].classList.remove('visible');
+    document.getElementById('outcomeArea').innerHTML = '';
+  }
+}
+
+function jumpFinal() {
+  steps.forEach(s => s.classList.add('visible'));
+  stepIndex = steps.length;
+  showOutcome();
+}
+
+function showOutcome() {
+  const c = currentCase;
+  const area = document.getElementById('outcomeArea');
+  area.innerHTML = `<div style="margin-top:12px;"><span class="outcome-badge ${c.status}">${c.status}</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+      ${c.status === 'PASS' ? 'Machine-verified receipt attached.' : c.status === 'BLOCKED' ? 'Candidate claim rejected by deterministic gate.' : 'No deterministic proof established. BARRED refuses certification.'}
+    </div>`;
+}
+
+function setPlayback(mode) {
+  playbackMode = mode;
+  document.getElementById('modeConcise').classList.toggle('active', mode==='concise');
+  document.getElementById('modeDetailed').classList.toggle('active', mode==='detailed');
+}
+
+function renderInspector() {
+  const c = currentCase;
+  const insp = document.getElementById('inspector');
+  let html = '';
+  html += `<h3>Predicate</h3><div class="trace">${escHtml(c.predicate||'')}</div>`;
+  html += `<h3>Source Code</h3><div class="code-block">${escHtml(c.source_code||'')}</div>`;
+  html += `<h3>Anchors</h3><div class="trace">${(c.anchors||[]).map(a=>escHtml(a)).join('\n')||'—'}</div>`;
+  if (c.candidate_id) html += `<h3>Candidate</h3><div class="trace">${c.candidate_id}</div>`;
+  if (c.gate_status) html += `<h3>Gate Status</h3><div class="trace">${c.gate_status}</div>`;
+  if (c.reason_code) html += `<h3>Reason Code</h3><div class="trace">${c.reason_code}</div>`;
+  if (c.checks && Object.keys(c.checks).length) {
+    html += `<h3>Checks</h3><ul class="checks">`;
+    for (const [k,v] of Object.entries(c.checks)) {
+      html += `<li><span>${escHtml(k)}</span><span class="${v?'ok':'fail'}">${v?'✓':'✗'}</span></li>`;
+    }
+    html += `</ul>`;
+  }
+  if (c.failure_reasons && c.failure_reasons.length) {
+    html += `<h3>Failure Reasons</h3><div class="trace">${c.failure_reasons.map(escHtml).join('\n')}</div>`;
+  }
+  if (c.counterfactual) html += `<h3>Relation</h3><div class="trace">${escHtml(c.counterfactual)}</div>`;
+  html += `<h3>Timing</h3><div class="trace">${c.timing_ms}ms · ${c.tokens} tokens</div>`;
+  html += `<h3>Artifact</h3><div class="trace"><a href="${c.artifact_links.sanitized_record}" target="_blank" style="color:var(--accent);">View sanitized JSON</a></div>`;
+  insp.innerHTML = html;
+}
+
+function jumpTo(status) {
+  // Find first case with that status
+  for (const run of catalog.runs) {
+    const c = run.cases.find(x => x.status === status);
+    if (c) { selectRun(run.id); selectScenario(c.scenario_id); selectRound(c.round); return; }
+  }
+}
+
+function updateComparison() {
+  if (!catalog) return;
+  const glimmer = catalog.runs.find(r => r.id.includes('glimmer'));
+  const spark = catalog.runs.find(r => r.id.includes('spark'));
+  if (glimmer && spark) {
+    const gt = glimmer.cases.reduce((s,c)=>s+c.timing_ms,0);
+    const st = spark.cases.reduce((s,c)=>s+c.timing_ms,0);
+    document.getElementById('comparisonText').textContent =
+      `Muse-Glimmer total tracked: ${(gt/1000).toFixed(1)}s (${glimmer.cases.length} cases) · ` +
+      `Muse Spark total tracked: ${(st/1000).toFixed(1)}s (${spark.cases.length} cases). ` +
+      `Timings are trace metadata from separate sessions with different serving environments.`;
+  }
+}
+
+function escHtml(s) { return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+init();
+</script>
+</body>
+</html>

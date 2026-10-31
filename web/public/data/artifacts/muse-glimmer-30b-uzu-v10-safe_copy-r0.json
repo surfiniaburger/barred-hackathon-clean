@@ -1,0 +1,195 @@
+{
+  "decision": "accepted",
+  "reject_reason": null,
+  "support_level": "supported",
+  "judge_eval": {
+    "outcome": "con_win",
+    "con_candidate_id": "C1",
+    "winner": "con_debater",
+    "support_level": "supported",
+    "anchors": [
+      "if (len >= cap)",
+      "memcpy(dst, src, len)",
+      "if (len >= cap) {\n        return;\n    }",
+      "if (len >= cap) {"
+    ]
+  },
+  "counter_evidence_validation": {
+    "status": "deterministically_confirmed",
+    "method": "structural_v1",
+    "failure_reasons": [],
+    "checks": {
+      "anchors_are_functional": true,
+      "control_flow_valid": true,
+      "counterfactual_coherent": true,
+      "guard_anchor_exact": true,
+      "operation_anchor_exact": true,
+      "predicate_precondition_blocked": true,
+      "value_relation_valid": true
+    },
+    "defense_kind": "upper_bound_reject",
+    "evidence": {
+      "defense_obligation": {
+        "kind": "upper_bound",
+        "version": "v1"
+      },
+      "guard_span": {
+        "end_byte": 106,
+        "end_line": 4,
+        "start_byte": 67,
+        "start_line": 2
+      },
+      "guarded_value": "len",
+      "operation_span": {
+        "end_byte": 132,
+        "end_line": 5,
+        "start_byte": 111,
+        "start_line": 5
+      },
+      "operation_value": "len",
+      "parser_mode": "original",
+      "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+      "relation": "rejecting_guard_dominates_operation",
+      "snippet_sha256": "8f27f7cd45d8b3033b7f1a76d81a8b1244f9a2576fb5da5f70bfff8693bff0fc"
+    }
+  },
+  "soft_checks": {
+    "mechanism_evidence": {
+      "has_code_token": true,
+      "has_operation_anchor": true,
+      "matched_code_tokens": [
+        "dst",
+        "len",
+        "cap",
+        "memcpy",
+        "src"
+      ],
+      "operation_anchor_hits": [
+        "if (len >= cap)",
+        "memcpy(dst, src, len)",
+        "if (len >= cap) {\n        return;\n    }",
+        "if (len >= cap) {"
+      ],
+      "operation_anchor_span_hits": [],
+      "operation_anchor_token_overlap_hits": [],
+      "pass": true
+    },
+    "mechanism_grounding": {
+      "hits": [
+        "if (len >= cap)",
+        "memcpy(dst, src, len)",
+        "if (len >= cap) {\n        return;\n    }",
+        "if (len >= cap) {"
+      ],
+      "pass": true
+    },
+    "mechanism_template": {
+      "anchor_hits_in_mechanism": 4,
+      "missing": [],
+      "pass": true
+    },
+    "predicate_aboutness": {
+      "candidates": [
+        "safe_copy",
+        "memcpy",
+        "called",
+        "len",
+        "verifying",
+        "that",
+        "does",
+        "not",
+        "exceed",
+        "capacity"
+      ],
+      "hits": [
+        "safe_copy",
+        "memcpy",
+        "len"
+      ],
+      "pass": true
+    },
+    "predicate_quality": {
+      "has_code_symbol": true,
+      "has_vulnerability_class": true,
+      "length": 143,
+      "pass": true,
+      "reasons": [],
+      "symbol_hits": [
+        "safe_copy",
+        "memcpy",
+        "len"
+      ]
+    }
+  },
+  "anchors_normalized": [
+    "if (len >= cap)",
+    "memcpy(dst, src, len)",
+    "if (len >= cap) {\n        return;\n    }",
+    "if (len >= cap) {"
+  ],
+  "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+  "refinement_round": 0,
+  "llm_usage": {
+    "totals": {
+      "avg_duration_ms": 122218.826,
+      "calls": 2,
+      "completion_tokens": 2650,
+      "cost_usd": 0.0,
+      "max_duration_ms": 130224.245,
+      "min_duration_ms": 114213.408,
+      "missing_usage_calls": 0,
+      "p95_duration_ms": 130224.245,
+      "prompt_tokens": 5202,
+      "total_duration_ms": 244437.653,
+      "total_tokens": 7852
+    },
+    "by_stage": {
+      "generator_boundary": {
+        "avg_duration_ms": 114213.408,
+        "calls": 1,
+        "completion_tokens": 1465,
+        "cost_usd": 0.0,
+        "max_duration_ms": 114213.408,
+        "prompt_tokens": 590,
+        "total_duration_ms": 114213.408,
+        "total_tokens": 2055
+      },
+      "judge_adjudication": {
+        "avg_duration_ms": 130224.245,
+        "calls": 1,
+        "completion_tokens": 1185,
+        "cost_usd": 0.0,
+        "max_duration_ms": 130224.245,
+        "prompt_tokens": 4612,
+        "total_duration_ms": 130224.245,
+        "total_tokens": 5797
+      }
+    }
+  },
+  "metadata": {
+    "seed": 42,
+    "clock_now": "2026-10-28T10:34:00Z",
+    "models": {
+      "debater": "openai/trymirai/Muse-Glimmer-30B-M",
+      "generator": "openai/trymirai/Muse-Glimmer-30B-M",
+      "judge": "openai/trymirai/Muse-Glimmer-30B-M",
+      "verifier": "openai/trymirai/Muse-Glimmer-30B-M"
+    },
+    "generation_config": {
+      "default": {
+        "max_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95
+      },
+      "model_overrides": {
+        "gemma4": {
+          "temperature": 1.0,
+          "top_k": 64,
+          "top_p": 0.95
+        }
+      },
+      "sampling_profile": "ollama_gemma4"
+    },
+    "sample_sha256": null
+  }
+}

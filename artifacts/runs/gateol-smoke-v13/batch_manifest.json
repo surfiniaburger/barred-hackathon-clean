@@ -1,0 +1,39 @@
+{
+  "attempts_path": "artifacts/attempts/gateol-smoke-v13.jsonl",
+  "base_seed": 42,
+  "cassette_path": "artifacts/cassettes/baseten-smoke-v1.json",
+  "checkpoint_dir": "artifacts/checkpoints",
+  "clock_now": "2026-10-30T13:28:20Z",
+  "items": [
+    {
+      "checkpoint_path": "artifacts/checkpoints/baseten-smoke-v1/42.json",
+      "index": 0,
+      "instruction": "Analyze this input for the condition: The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+      "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.",
+      "record_path": "artifacts/runs/baseten-smoke-v1/42.json",
+      "response_excerpt": "Sample Accepted and saved to artifacts/factorial/corpus_gateol_smoke_v13.jsonl\n1. Core mechanism is bounded copy where len is used as memcpy size with cap as dst capacity. 2. Pro attack claims unchecked len, but code contains explicit reject if len>cap before memcpy. 3. Con defense is valid: guard enforces 0<=len<=cap invariant, same len flows to sink, reject_before_operation prevents overflow. 4. Verdict is predicate false; C1 receipt matches guard, operation, and value equality.\n{'active_mutat",
+      "seed": 42,
+      "status": "completed"
+    },
+    {
+      "checkpoint_path": "artifacts/checkpoints/baseten-smoke-v1/43.json",
+      "index": 1,
+      "instruction": "Analyze this input for the condition: The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+      "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero",
+      "record_path": "artifacts/runs/baseten-smoke-v1/43.json",
+      "response_excerpt": "Failed to reach consensus.",
+      "seed": 43,
+      "status": "completed"
+    }
+  ],
+  "mode": "record",
+  "output_path": "artifacts/factorial/corpus_gateol_smoke_v13.jsonl",
+  "record_dir": "artifacts/runs",
+  "run_id": "baseten-smoke-v1",
+  "schema_version": 1,
+  "seed_schedule": "item_seed = base_seed + zero_based_index",
+  "seeds_path": "scenarios/debate/cve_seeds_smoke_2gate.jsonl",
+  "seeds_sha256": "e62cf44582f9bd721b3fdbcb9f511ddd31c250633c7c1f44cf4193d5b9409ee8",
+  "started_at": "2026-10-30T13:28:20Z",
+  "updated_at": "2026-10-30T13:28:20Z"
+}
