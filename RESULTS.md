@@ -100,4 +100,7 @@ uv run python cli.py demo --offline
 
 # 3. Run confusion matrix evaluator
 uv run python cli.py eval --attempts evidence_pack/m9bol_gate_smoke_v10_attempts.jsonl
+
+# 4. Live Glimmer rerun (optional, ~30-50 min; mirai + stack per README)
+#    Same shape: TN on seed 42, justified abstention on seed 90
 ```

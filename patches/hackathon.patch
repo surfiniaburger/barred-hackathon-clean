@@ -2771,12 +2771,12 @@ index 7b8078e..dd7b3a9 100644
          )
 diff --git a/scenarios/debate/cve_seeds_smoke_2gate.jsonl b/scenarios/debate/cve_seeds_smoke_2gate.jsonl
 new file mode 100644
-index 0000000..0b832db
+index 0000000..f9d14f9
 --- /dev/null
 +++ b/scenarios/debate/cve_seeds_smoke_2gate.jsonl
 @@ -0,0 +1,2 @@
-+{"topic": "void safe_copy(char *dst, const char *src, int len, int cap) {\n    if (len > cap) {\n        return;\n    }\n    memcpy(dst, src, len);\n}\n", "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.", "gepa_info": {"predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.", "evidence_hooks": ["if (len > cap)", "memcpy(dst, src, len)"], "uncertainty": "Low", "proof_requirements": "Check if len is bounded by cap before memcpy."}, "language": "c", "original_safety": "safe", "anchors": ["if (len > cap)", "memcpy(dst, src, len)", "len", "cap", "dst", "src"], "defense_obligation": {"version": "v1", "kind": "upper_bound"}}
-+{"topic": "/**\n\n * Test that failure to convert to JPEG returns NULL\n\n *\n\n * We are creating an image, set its width to zero, and pass this image to\n\n * `gdImageJpegPtr()` which is supposed to fail, and as such should return NULL.\n\n *\n\n * See also <https://github.com/libgd/libgd/issues/381>\n\n */\n\n\n\n\n\n#include \"gd.h\"\n\n#include \"gdtest.h\"\n\n\n\n\n\nint main()\n\n{\n\n    gdImagePtr src, dst;\n\n    int size;\n\n\n\n    src = gdImageCreateTrueColor(1, 10);\n\n    gdTestAssert(src != NULL);\n\n\n\n    src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */\n\n\n\n    dst = gdImageJpegPtr(src, &size, 0);\n\n    gdTestAssert(dst == NULL);\n\n\n\n    gdImageDestroy(src);\n\n\n\n    return gdNumFailures();\n\n}\n", "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero", "gepa_info": {"predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero", "evidence_hooks": ["`src->sx = 0;`", "`gdImageJpegPtr(src, &size, 0);`"], "uncertainty": "Medium", "proof_requirements": "Run the program with a debug build of libgd and a memory\u2011sanitizer (e.g., AddressSanitizer or Valgrind). If `gdImageJpegPtr` reads or writes past the allocated image buffer, the sanitizer will report a buffer overflow or invalid read/write caused by the zero width. Conversely, if the function checks `src->sx` and returns NULL without touching the image data, no such report will appear, refuting the predicate."}, "language": "c", "original_safety": "safe", "anchors": ["src->sx = 0", "gdImageJpegPtr(src, &size, 0)", "gdImageJpegPtr", "sx", "src", "size", "image", "width", "set", "zero"], "defense_obligation": {"version": "v1", "kind": "upper_bound"}}
++{"seed": 42, "topic": "void safe_copy(char *dst, const char *src, int len, int cap) {\n    if (len > cap) {\n        return;\n    }\n    memcpy(dst, src, len);\n}\n", "predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.", "gepa_info": {"predicate": "The code is vulnerable to a buffer overflow in safe_copy because memcpy is called with len without verifying that len does not exceed capacity.", "evidence_hooks": ["if (len > cap)", "memcpy(dst, src, len)"], "uncertainty": "Low", "proof_requirements": "Check if len is bounded by cap before memcpy."}, "language": "c", "original_safety": "safe", "anchors": ["if (len > cap)", "memcpy(dst, src, len)", "len", "cap", "dst", "src"], "defense_obligation": {"version": "v1", "kind": "upper_bound"}}
++{"seed": 90, "topic": "/**\n\n * Test that failure to convert to JPEG returns NULL\n\n *\n\n * We are creating an image, set its width to zero, and pass this image to\n\n * `gdImageJpegPtr()` which is supposed to fail, and as such should return NULL.\n\n *\n\n * See also <https://github.com/libgd/libgd/issues/381>\n\n */\n\n\n\n\n\n#include \"gd.h\"\n\n#include \"gdtest.h\"\n\n\n\n\n\nint main()\n\n{\n\n    gdImagePtr src, dst;\n\n    int size;\n\n\n\n    src = gdImageCreateTrueColor(1, 10);\n\n    gdTestAssert(src != NULL);\n\n\n\n    src->sx = 0; /* this hack forces gdImageJpegPtr() to fail */\n\n\n\n    dst = gdImageJpegPtr(src, &size, 0);\n\n    gdTestAssert(dst == NULL);\n\n\n\n    gdImageDestroy(src);\n\n\n\n    return gdNumFailures();\n\n}\n", "predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero", "gepa_info": {"predicate": "The code is vulnerable to out\u2011of\u2011bounds memory access in `gdImageJpegPtr` when the image width (`sx`) is artificially set to zero", "evidence_hooks": ["`src->sx = 0;`", "`gdImageJpegPtr(src, &size, 0);`"], "uncertainty": "Medium", "proof_requirements": "Run the program with a debug build of libgd and a memory\u2011sanitizer (e.g., AddressSanitizer or Valgrind). If `gdImageJpegPtr` reads or writes past the allocated image buffer, the sanitizer will report a buffer overflow or invalid read/write caused by the zero width. Conversely, if the function checks `src->sx` and returns NULL without touching the image data, no such report will appear, refuting the predicate."}, "language": "c", "original_safety": "safe", "anchors": ["src->sx = 0", "gdImageJpegPtr(src, &size, 0)", "gdImageJpegPtr", "sx", "src", "size", "image", "width", "set", "zero"], "defense_obligation": {"version": "v1", "kind": "upper_bound"}}
 diff --git a/scenarios/debate/graphify_flow_extractor.py b/scenarios/debate/graphify_flow_extractor.py
 index 7cc3d7c..a682172 100644
 --- a/scenarios/debate/graphify_flow_extractor.py
@@ -2792,3 +2792,67 @@ index 7cc3d7c..a682172 100644
              return "safe_branch_dominates_operation"
      elif relation == "guarded_value_equals_operation_value" and ("<=" in condition_text or "<" in condition_text):
          return "safe_branch_bounds"
+diff --git a/src/agentbeats/run_scenario.py b/src/agentbeats/run_scenario.py
+index bc937a8..08c10a1 100644
+--- a/src/agentbeats/run_scenario.py
++++ b/src/agentbeats/run_scenario.py
+@@ -9,7 +9,9 @@ from dotenv import load_dotenv
+ from a2a.client import A2ACardResolver
+ 
+ 
+-load_dotenv(override=True)
++# Shell exports win: start.sh pins the serving model, and a stale parent-dir
++# .env must not silently relabel the run's model provenance.
++load_dotenv(override=False)
+ 
+ 
+ async def wait_for_agents(cfg: dict, timeout: int = 30) -> bool:
+diff --git a/scenarios/debate/run_batch.py b/scenarios/debate/run_batch.py
+--- a/scenarios/debate/run_batch.py
++++ b/scenarios/debate/run_batch.py
+@@ -446,6 +446,12 @@
+             return True
+ 
+     return False
++
++
++def _resolve_item_seed(seed: dict, base_seed: int, index: int) -> int:
++    """Canonical seed id when the seed file provides one, else base+index."""
++    sid = seed.get("seed")
++    return int(sid) if sid is not None else base_seed + index
+ 
+ 
+ async def _process_seed(
+@@ -465,7 +471,7 @@
+             await asyncio.to_thread(save_checkpoint, ctx.manifest_path, ctx.manifest, clock_now=ctx.batch_started_at)
+ 
+     async with sem:
+-        item_seed = ctx.args.seed + i
++        item_seed = _resolve_item_seed(seed, ctx.args.seed, i)
+         if await _should_skip_seed(ctx, seed, item_seed, i, write_manifest):
+             return
+ 
+@@ -531,11 +537,11 @@
+     manifest_items = [
+         {
+             "index": i,
+-            "seed": args.seed + i,
++            "seed": _resolve_item_seed(s, args.seed, i),
+             "instruction": f"Analyze this input for the condition: {s['predicate']}",
+             "predicate": s["predicate"],
+-            "checkpoint_path": os.path.join(args.checkpoint_dir, args.run_id, f"{args.seed + i}.json"),
+-            "record_path": args.record_path or os.path.join(args.record_dir, args.run_id, f"{args.seed + i}.json"),
++            "checkpoint_path": os.path.join(args.checkpoint_dir, args.run_id, f"{_resolve_item_seed(s, args.seed, i)}.json"),
++            "record_path": args.record_path or os.path.join(args.record_dir, args.run_id, f"{_resolve_item_seed(s, args.seed, i)}.json"),
+             "status": "pending",
+         }
+         for i, s in enumerate(seeds)
+@@ -546,7 +552,7 @@
+         "run_id": args.run_id,
+         "mode": args.mode,
+         "base_seed": args.seed,
+-        "seed_schedule": "item_seed = base_seed + zero_based_index",
++        "seed_schedule": "item_seed = seed['seed'] if present else base_seed + zero_based_index",
+         "started_at": batch_started_at,
+         "clock_now": batch_started_at,
+         "seeds_path": args.seeds,

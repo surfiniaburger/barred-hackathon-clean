@@ -92,14 +92,78 @@ mirai server --model trymirai/Muse-Glimmer-30B-M --port 8123
 
 # Terminal 2: run the stack + app against it
 ./bootstrap.sh
-export LLM_API_BASE=http://127.0.0.1:8123/v1 LLM_MODEL=openai/meta:muse-glimmer:30b:mirai:mirai-m:4 LLM_API_KEY=dummy
+export LLM_API_BASE=http://127.0.0.1:8123/v1
+export LLM_MODEL=openai/meta:muse-glimmer:30b:mirai:mirai-m:4
+export LLM_API_KEY=dummy
+echo "BASE=$LLM_API_BASE"
+chmod +x start.sh
 ./start.sh
 ```
+
+`BASE=` must print `http://127.0.0.1:8123/v1` before you start — an empty
+value means an export typo'd (wrong base = 401s from the default endpoint).
+`chmod` guards fresh clones where `start.sh` loses its exec bit
+(`permission denied`).
 
 (Any other OpenAI-compatible server works the same way, e.g.
 `LLM_API_BASE=http://localhost:11434/v1` for Ollama, or Qwen3.5-4B via
 `mirai server --model trymirai/Qwen3.5-4B-M`.) This exercises the real debate
 + deterministic gate end to end; only the model behind the endpoint differs.
+
+### Local Glimmer end-to-end run (2-gate smoke, ~30–50 min)
+
+With Terminals 1–2 above running, execute the two canonical seeds and score them:
+
+```bash
+# Terminal 3: run both seeds (leave T1/T2 running; log the run)
+cd foundation
+export PYTHONPATH="$PWD:$PYTHONPATH"
+export LLM_API_BASE=http://127.0.0.1:8123/v1
+export LLM_MODEL=openai/meta:muse-glimmer:30b:mirai:mirai-m:4
+export LLM_API_KEY=dummy
+echo "BASE=$LLM_API_BASE"
+mkdir -p ../runs/local-glimmer-e2e
+time uv run python scenarios/debate/run_batch.py \
+  --seeds scenarios/debate/cve_seeds_smoke_2gate.jsonl \
+  --run-id local-glimmer-e2e \
+  --output ../runs/local-glimmer-e2e/corpus.jsonl \
+  --gepa-dir ../runs/local-glimmer-e2e/gepa \
+  --attempts-out ../runs/local-glimmer-e2e/attempts.jsonl \
+  --manifest-out ../runs/local-glimmer-e2e/manifest.json \
+  --seed 42 \
+  --mode record \
+  --slice-judge \
+  --reflector \
+  --reflector-in-process \
+  --reflector-mode symmetric \
+  --escalate-pareto \
+  --max-concurrency 1 \
+  --counter-evidence-validation-mode enforce_deterministic \
+  --halt-on-con-win 2>&1 | tee ../runs/local-glimmer-e2e/run.log
+```
+
+Only start T3 after T2 prints `Port 9020 ready` (otherwise 503 agent-card
+errors from 9009). Same `BASE=` guard as T2 — confirm it prints the 8123
+URL before launching the batch. Outputs land in `runs/local-glimmer-e2e/`
+(gitignored).
+
+Verify (from the repo root):
+
+```bash
+uv run python cli.py eval --attempts runs/local-glimmer-e2e/attempts.jsonl
+```
+
+Expected: seed 42 → SAFE (`TN`), seed 90 → `UNRESOLVED` abstention (see
+[`RESULTS.md`](RESULTS.md) for why the Seed 90 abstention is justified, not a
+failure). The smoke file carries canonical ledger ids, so no seed remapping is
+needed. What must never happen: a `PASS` on seed 90, or any
+`deterministically_confirmed` receipt on invalid evidence — that is the gate
+guarantee being witnessed live.
+
+**Model provenance.** `start.sh` pins the serving model via `LLM_*` exports,
+and shell exports take precedence over any parent-directory `.env`
+(`run_scenario.py` uses `load_dotenv(override=False)`), so the model recorded
+in `attempts.jsonl` telemetry matches the server T1 is actually running.
 
 **Version pins.** Local Glimmer-30B chat verified end to end on `mirai` 0.6.15
 (Qwen chat also verified, on 0.6.11). Note `mirai server` on 0.6.11 panics on
