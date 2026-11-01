@@ -13,7 +13,7 @@
 2. **Mathematical Receipt Validator (`scenarios/debate/counter_evidence_validation.py`):** Verifies invariant contracts to eliminate AI safety hallucinations and false positives (achieving `0.0%` accepted logic error rate across all benchmarks).
 3. **Meta Muse-Glimmer-30B Integration:** End-to-end multi-agent debate, adjudication, and candidate selection powered by Meta's open-weights model via Uzu.
 4. **Fault-Tolerant 3-Way Adjudication Contracts:** `PASS` (Proven via C1) | `BLOCKED` (Falsified/Exploitable) | `UNRESOLVED` (Explicit abstention on unsupported domains).
-5. **Architectural Bug Fixes & False-Positive Elimination:** Hardened through 40 regression tests closing null-receipt false passes, non-dominating guard hallucinations, schema coercion failures, and ungrounded wrapper claims.
+5. **Architectural Bug Fixes & False-Positive Elimination:** Hardened through 43 regression tests closing null-receipt false passes, non-dominating guard hallucinations, schema coercion failures, and ungrounded wrapper claims.
 6. **One-Command Reviewer CLI & Evidence Pack:** A developer-facing tool allowing instant 30-second inspection or full live verification.
 
 ---
@@ -72,23 +72,22 @@ uv run python cli.py demo --offline
 
 ## Verification, Test Suite & Bug Fixes
 
-### 🧪 40 TDD & Regression Tests (Passing in 1.4s)
-All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 40-test offline suite:
+### 🧪 43 TDD & Regression Tests (Passing in ~8s)
+All core validator mechanisms, candidate extractors, and failure-mode mitigations are verified by a comprehensive 43-test offline suite:
 ```bash
-# Standalone (no foundation needed):
+# Standalone (no foundation needed, 16 tests):
 uv run pytest tests/test_con_receipt_extractor.py tests/test_counter_evidence_fixtures.py -v
 
-# Full suite (after bootstrap.sh):
+# Full suite (after bootstrap.sh, 27 tests):
 cd foundation && uv run pytest \
   tests/test_con_receipt_e2e.py \
-  tests/test_con_receipt_extractor.py \
-  tests/test_counter_evidence_fixtures.py \
+  tests/test_counter_evidence_validation.py \
   tests/test_debate_eval_schema.py \
   tests/test_failure_modes_replay.py -v
 ```
 
 ### 🛡️ Bug Fixes & False-Positive Elimination
-In baseline unconstrained multi-agent debate runs, models routinely suffered from critical false positives and hallucinated defenses. The 40 tests explicitly encode and guard against these historical failure modes:
+In baseline unconstrained multi-agent debate runs, models routinely suffered from critical false positives and hallucinated defenses. The 43 tests explicitly encode and guard against these historical failure modes:
 
 1. **Elimination of Null-Receipt False Passes** (covered by `test_counter_evidence_fixtures.py`):
    - *Previous Defect:* LLM judges previously awarded defense wins (`winner="con_debater"`) based solely on plausible-sounding rhetoric without machine-verifiable receipts, causing catastrophic false positives on vulnerable code.
@@ -113,9 +112,10 @@ In baseline unconstrained multi-agent debate runs, models routinely suffered fro
 
 | Verdict | Count | Description |
 | :--- | :---: | :--- |
-| `proved_safe` | **20** | Deterministic AST proof confirmed the fix is correct |
-| `confirmed_vulnerable` | **22** | Fix is insufficient or exploitable; model should output `BLOCKED` or `UNRESOLVED` |
-| `context_deficient` | **8** | Seeds 45, 49, 54, 56, 60, 70, 74, 91 — insufficient source context for proof either way; correct system behavior is epistemic abstention (`UNRESOLVED`) |
+| `proved_safe` | **13** | Deterministic AST proof confirmed the fix is correct |
+| `confirmed_vulnerable` | **11** | Fix is insufficient or exploitable; model should output `BLOCKED` or `UNRESOLVED` |
+| `context_deficient` | **16** | Insufficient source context for proof either way; correct system behavior is epistemic abstention (`UNRESOLVED`) |
+| `ambiguous` | **10** | Seeds where ground-truth verdict is ambiguous; system should abstain |
 
 The 8 context-deficient seeds represent BARRED's honest epistemic boundary: the system abstains rather than hallucinating a verdict.
 

@@ -8,9 +8,10 @@ This document summarises the measurable impact of BARRED's deterministic evidenc
 
 | Verdict | Seeds | Count |
 | :--- | :--- | :---: |
-| `proved_safe` | 42, 44, 46–48, 50–53, 55, 57–59, 61–69 (sample) | **20** |
-| `confirmed_vulnerable` | 43, 71–91 (sample) | **22** |
-| `context_deficient` | 45, 49, 54, 56, 60, 70, 74, 91 | **8** |
+| `proved_safe` | (13 seeds) | **13** |
+| `confirmed_vulnerable` | (11 seeds) | **11** |
+| `context_deficient` | (16 seeds) | **16** |
+| `ambiguous` | (10 seeds) | **10** |
 
 *Full per-seed verdicts: [`reports/BARRED_Track_1_Canonical_Ledger.csv`](reports/BARRED_Track_1_Canonical_Ledger.csv)*
 
