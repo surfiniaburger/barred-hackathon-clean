@@ -4,13 +4,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-# Baseten config
-export DEBATER_MODEL="openai/meta-models/muse-spark-open-1026"
-export VERIFIER_MODEL="openai/meta-models/muse-spark-open-1026"
-export GENERATOR_MODEL="openai/meta-models/muse-spark-open-1026"
-export JUDGE_MODEL="openai/meta-models/muse-spark-open-1026"
-export OPENAI_API_BASE="https://inference.baseten.co/v1"
-export OPENAI_API_KEY="${BASETEN_API_KEY:-}"
+# LLM backend: Baseten-hosted Muse Spark by default. Override LLM_MODEL /
+# LLM_API_BASE / LLM_API_KEY to use any OpenAI-compatible endpoint instead
+# (e.g. a local Ollama/LM Studio server — no API key needed).
+export LLM_MODEL="${LLM_MODEL:-openai/meta-models/muse-spark-open-1026}"
+export LLM_API_BASE="${LLM_API_BASE:-https://inference.baseten.co/v1}"
+export LLM_API_KEY="${LLM_API_KEY:-${BASETEN_API_KEY:-}}"
+export DEBATER_MODEL="$LLM_MODEL"
+export VERIFIER_MODEL="$LLM_MODEL"
+export GENERATOR_MODEL="$LLM_MODEL"
+export JUDGE_MODEL="$LLM_MODEL"
+export OPENAI_API_BASE="$LLM_API_BASE"
+export OPENAI_API_KEY="$LLM_API_KEY"
 export LLM_SAMPLING_PROFILE="env"
 export LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-4096}"
 export SEND_MESSAGE_TIMEOUT="${SEND_MESSAGE_TIMEOUT:-1800}"

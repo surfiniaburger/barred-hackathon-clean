@@ -82,6 +82,33 @@ docker build -t barred .
 docker run -e BASETEN_API_KEY=<your-key> -p 8080:8080 barred
 ```
 
+Live runs also work against any OpenAI-compatible endpoint with no API key
+(use the `openai/` prefix so LiteLLM routes to your base URL). Verified path
+on Apple Silicon via Mirai (swap in any served model ID):
+
+```bash
+# Terminal 1: serve local weights (no key; requires mirai>=0.6.15)
+mirai server --model trymirai/Muse-Glimmer-30B-M --port 8123
+
+# Terminal 2: run the stack + app against it
+./bootstrap.sh
+export LLM_API_BASE=http://127.0.0.1:8123/v1 LLM_MODEL=openai/meta:muse-glimmer:30b:mirai:mirai-m:4 LLM_API_KEY=dummy
+./start.sh
+```
+
+(Any other OpenAI-compatible server works the same way, e.g.
+`LLM_API_BASE=http://localhost:11434/v1` for Ollama, or Qwen3.5-4B via
+`mirai server --model trymirai/Qwen3.5-4B-M`.) This exercises the real debate
++ deterministic gate end to end; only the model behind the endpoint differs.
+
+**Version pins.** Local Glimmer-30B chat verified end to end on `mirai` 0.6.15
+(Qwen chat also verified, on 0.6.11). Note `mirai server` on 0.6.11 panics on
+the Glimmer weights (`Weaver MLP does not support input Hadamard factors`) —
+use `mirai>=0.6.15` for Glimmer-30B. The recorded Glimmer runs in
+`evidence_pack/` were produced 2026-10-28 through the Uzu Python engine
+(`uzu==0.6.8`) with model `trymirai/Muse-Glimmer-30B-M` (weights
+`meta:muse-glimmer:30b:mirai:mirai-m:4`).
+
 **No API key?** Every tri-state outcome is reproducible without one: the offline
 demo above, `cli.py review --offline`, and `cli.py eval` all run on the curated
 `evidence_pack/` (recorded model telemetry + deterministic re-validation), and
