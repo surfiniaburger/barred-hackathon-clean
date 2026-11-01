@@ -41,7 +41,7 @@
       "failure_reasons": [
         "counter_evidence_missing"
       ],
-      "benchmark_seed_note": "benchmark seed 90 (context_deficient per canonical ledger)"
+      "benchmark_seed_note": "benchmark seed 90 (ground truth proved_safe per Seed 90 evidence audit; safety proof requires upstream libgd source outside the seed, so no valid in-seed candidate exists and the R0 hallucination was correctly intercepted)"
     },
     {
       "seed": 90,
@@ -51,7 +51,7 @@
       "gate_status": "epistemic_boundary_respected",
       "terminal_outcome": "UNRESOLVED",
       "reason": "unsupported_proof_domain: Third-party library wrapper is outside deterministic memory-safety domain V1. Refused to certify safety.",
-      "benchmark_seed_note": "benchmark seed 90 (context_deficient per canonical ledger)"
+      "benchmark_seed_note": "benchmark seed 90 (ground truth proved_safe per Seed 90 evidence audit; abstention is justified, not a failure: the seed contains only the test harness, and the safety proof needs library source the system is not given — see RESULTS.md)"
     }
   ]
 }

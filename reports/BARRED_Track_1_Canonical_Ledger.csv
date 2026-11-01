@@ -1,51 +1,51 @@
 seed,raw_status,verdict,defense_obligation
 42,proved_safe_normal_linux_3_18_vfs_path,proved_safe,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
-43,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
+43,confirmed_vulnerable_ghash_null_gf128_before_setkey,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
 44,confirmed_vulnerable_timing_side_channel,confirmed_vulnerable,
-45,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+45,context_deficient_unchecked_ucount_type_reachability,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 46,proved_safe_libxml2_mem_parser_size_guard,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 47,proved_safe_posix_acl_from_xattr_allocates_own_acl,proved_safe,
-48,triage_likely_invalid,ambiguous,
+48,proved_safe_llc_sysctl_mode_0644_root_only,proved_safe,
 49,context_deficient_unresolved_createwbmp_overflow,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 50,proved_safe_percent_decode_bounds_claim,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 51,proved_safe_rename_does_not_dereference_symlink,proved_safe,
 52,proved_safe_vcc_setsockopt_optlen_validated,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-53,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-54,triage_context_deficient,context_deficient,
+53,confirmed_vulnerable_udp6_ufo_division_by_zero,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+54,context_deficient_bug_reachability_unproven,context_deficient,
 55,confirmed_vulnerable_unchecked_data_len,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 56,context_deficient_gss_handle_reachability_unproven,context_deficient,
 57,proved_safe_big_key_path_nullified_after_put,proved_safe,
-58,triage_ambiguous,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-59,triage_likely_invalid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+58,proved_safe_frag6_print_nd_tcheck_guard,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+59,confirmed_vulnerable_mlx4_register_mac_off_by_one_oob,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 60,context_deficient_unresolved_gss_handle_validation,context_deficient,
 61,confirmed_vulnerable_zlib_drv_size_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 62,proved_safe_sock_diag_mutex_held_across_dump,proved_safe,
-63,triage_likely_valid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-64,triage_likely_invalid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-65,triage_likely_valid,ambiguous,
+63,proved_safe_ip6_finddst_bounded_iteration,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+64,confirmed_vulnerable_huff_compress_seq_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+65,confirmed_vulnerable_ifb_rcu_unlock_before_use,confirmed_vulnerable,
 66,proved_safe_crypto_rng_synchronous_seed_contract,proved_safe,
-67,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+67,confirmed_vulnerable_ieee802_15_4_oob_read,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 68,proved_safe_isofs_export_parent_offset_bound,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 69,confirmed_vulnerable_sasl_credential_aliasing,confirmed_vulnerable,
 70,context_deficient_unresolved_perl_runtime_contract,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 71,confirmed_vulnerable_chm_zip_slip_path_traversal,confirmed_vulnerable,
 72,proved_safe_nghttp2_user_recv_ext_types_32_byte_bitmask,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 73,confirmed_vulnerable_udf_pc_to_char_oob_write,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-74,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
+74,context_deficient_nf_nat_redirect_mr_reachability,context_deficient,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
 75,confirmed_vulnerable_abrt_dump_dir_path_injection,confirmed_vulnerable,
-76,triage_likely_valid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-77,triage_context_deficient,context_deficient,
+76,confirmed_vulnerable_asn1_strlen_oob_read,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+77,confirmed_vulnerable_ipv6_exthdrs_len_uninitialized_opps,confirmed_vulnerable,
 78,confirmed_vulnerable_stack_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 79,confirmed_vulnerable_process_tree_null_deref,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""null_dereference""}"
 80,confirmed_vulnerable_ras_length_integer_overflow,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-81,triage_likely_valid,ambiguous,
-82,triage_context_deficient,context_deficient,
-83,triage_likely_invalid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-84,triage_ambiguous,context_deficient,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+81,confirmed_vulnerable_omninet_write_urb_flag_mismatch,confirmed_vulnerable,
+82,proved_safe_ipv6_defrag_uses_return_value_only,proved_safe,
+83,proved_safe_convert_ip_to_linear_ldt_bounds_check,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+84,proved_safe_tcp_packet_get_bounded_recv,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
 85,confirmed_vulnerable_abrt_toctou_privilege_escalation,confirmed_vulnerable,
 86,proved_safe_lua_extra_stack_guarantee,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-87,triage_likely_valid,ambiguous,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-88,triage_likely_valid,ambiguous,
-89,triage_context_deficient,context_deficient,
+87,confirmed_vulnerable_lzo_need_ip_missing,confirmed_vulnerable,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
+88,proved_safe_crypto_reportstat_mod_put_before_return,proved_safe,
+89,confirmed_vulnerable_nx842_dangling_timer,confirmed_vulnerable,
 90,proved_safe_gd_jpeg_zero_width_bounds,proved_safe,"{""version"": ""v1"", ""kind"": ""upper_bound""}"
-91,triage_context_deficient,context_deficient,"{""version"": ""v1"", ""kind"": ""identity_mismatch""}"
+91,context_deficient_service_principal_policy_dependent,context_deficient,"{""version"": ""v1"", ""kind"": ""identity_mismatch""}"

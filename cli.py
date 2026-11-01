@@ -273,20 +273,27 @@ def eval_attempts(attempts_path: str, ledger_path: str) -> None:
     total_evaluated = len(seed_details)
     resolved_gt_count = sum(1 for item in seed_details if item["gt"] in ("proved_safe", "confirmed_vulnerable"))
     context_deficient_count = sum(1 for item in seed_details if item["gt"] == "context_deficient")
+    # Benchmark totals are derived from the ledger itself so display labels
+    # cannot drift from ground truth again.
+    ledger_safe_total = sum(1 for gt in ledger.values() if gt == "proved_safe")
+    ledger_vuln_total = sum(1 for gt in ledger.values() if gt == "confirmed_vulnerable")
+    ledger_cd_total = sum(1 for gt in ledger.values() if gt == "context_deficient")
 
     print(f"\n{BOLD}Confusion Matrix (Resolved Benchmark Ground-Truth):{RESET}")
     print(f"┌────────────────────────┬───────────────────────┬───────────────────────┐")
     print(f"│                        │ Predicted SAFE (Con)  │ Predicted VULN (Pro)  │")
     print(f"├────────────────────────┼───────────────────────┼───────────────────────┤")
-    print(f"│ Actual SAFE (13)       │ {GREEN}{BOLD}TN = {tn:<17}{RESET}│ {RED if fp > 0 else GRAY}FP = {fp:<17}{RESET}│")
-    print(f"│ Actual VULNERABLE (22) │ {RED if fn > 0 else GRAY}FN = {fn:<17}{RESET}│ {GREEN}{BOLD}TP = {tp:<17}{RESET}│")
+    print(f"│ Actual SAFE ({ledger_safe_total:<2})       │ {GREEN}{BOLD}TN = {tn:<17}{RESET}│ {RED if fp > 0 else GRAY}FP = {fp:<17}{RESET}│")
+    print(f"│ Actual VULNERABLE ({ledger_vuln_total:<2}) │ {RED if fn > 0 else GRAY}FN = {fn:<17}{RESET}│ {GREEN}{BOLD}TP = {tp:<17}{RESET}│")
     print(f"└────────────────────────┴───────────────────────┴───────────────────────┘")
 
     print(f"\n{BOLD}Epistemic Boundary Metrics:{RESET}")
-    print(f" - Context-Deficient Seeds (16 total in benchmark): {context_deficient_count} evaluated")
+    print(f" - Context-Deficient Seeds ({ledger_cd_total} total in benchmark): {context_deficient_count} evaluated")
     print(f"   └─ Correct Epistemic Refusals (`UNRESOLVED`): {GREEN}{unres_cd} / {context_deficient_count}{RESET} ({100.0 * unres_cd / max(1, context_deficient_count):.1f}%)")
-    print(f" - Resolved Seeds Abstained: {unres_res}")
-    print(f" - Unverified False Safety Passes: {RED if fn > 0 else GREEN}{fn}{RESET} (0.0% false claim rate)")
+    print(f" - Resolved Seeds Abstained: {unres_res} (excluded from accuracy; see RESULTS.md for the Seed 90 justification)")
+    decided = tp + tn + fp + fn
+    false_claim_rate = 100.0 * fn / max(1, decided)
+    print(f" - Unverified False Safety Passes: {RED if fn > 0 else GREEN}{fn}{RESET} ({false_claim_rate:.1f}% false claim rate)")
 
     if resolved_gt_count > 0:
         resolved_accuracy = (tp + tn) / max(1, (tp + tn + fp + fn)) * 100.0

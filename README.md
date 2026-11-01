@@ -110,14 +110,13 @@ In baseline unconstrained multi-agent debate runs, models routinely suffered fro
 
 [`reports/BARRED_Track_1_Canonical_Ledger.csv`](reports/BARRED_Track_1_Canonical_Ledger.csv) is the human-adjudicated ground-truth for all 50 seeds (IDs 42–91) evaluated during the hackathon period:
 
-| Verdict | Count | Description |
+| Verdict | Count | Seeds |
 | :--- | :---: | :--- |
-| `proved_safe` | **13** | Deterministic AST proof confirmed the fix is correct |
-| `confirmed_vulnerable` | **11** | Fix is insufficient or exploitable; model should output `BLOCKED` or `UNRESOLVED` |
-| `context_deficient` | **16** | Insufficient source context for proof either way; correct system behavior is epistemic abstention (`UNRESOLVED`) |
-| `ambiguous` | **10** | Seeds where ground-truth verdict is ambiguous; system should abstain |
+| `proved_safe` | **20** | 42, 46–48, 50–52, 57, 58, 62, 63, 66, 68, 72, 82–84, 86, 88, 90 |
+| `confirmed_vulnerable` | **22** | 43, 44, 53, 55, 59, 61, 64, 65, 67, 69, 71, 73, 75–81, 85, 87, 89 |
+| `context_deficient` | **8** | 45, 49, 54, 56, 60, 70, 74, 91 |
 
-The 8 context-deficient seeds represent BARRED's honest epistemic boundary: the system abstains rather than hallucinating a verdict.
+Verdicts come from the per-seed evidence audits (`BARRED_Track_1_Seed_XX_Evidence_Audit.md`): `proved_safe` means the audit refuted the exact claim on mechanism; `confirmed_vulnerable` means the audit reproduced the claimed mechanism; `context_deficient` means the seed omits the decisive implementation or reachability evidence, so the correct system behavior is epistemic abstention (`UNRESOLVED`) rather than a hallucinated verdict.
 
 Run the confusion matrix evaluator against any batch attempt log:
 ```bash
