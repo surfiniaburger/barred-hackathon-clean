@@ -50,6 +50,10 @@ After bootstrap, the full pipeline is available under `foundation/`.
 The offline demo (`cli demo --offline`) works without the foundation — it uses
 the curated evidence pack in `evidence_pack/`.
 
+Dependency note: `scenarios/debate/graph_dataflow.py` is vendored unmodified
+from `inert-silver` so the offline reviewer runs standalone; it is a pre-event
+dependency module, not claimed event work.
+
 ## Quickstart & Evaluation Modes
 
 ### Run the Demo (Offline Replay)
