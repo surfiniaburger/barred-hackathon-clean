@@ -7,3 +7,4 @@ __pycache__/
 foundation/
 patches/*.orig
 uv.lock
+runs/

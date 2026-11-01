@@ -62,6 +62,32 @@ Inspect the three canonical outcomes without needing a 20GB+ GPU running:
 uv run python cli.py demo --offline
 ```
 
+### Live Mode (Debate Stack + Web UI)
+
+Live runs execute the full multi-agent debate against Meta models served via
+**Baseten** (a separate private product — set `BASETEN_API_KEY`). Requires the
+bootstrapped foundation:
+
+```bash
+./bootstrap.sh
+export BASETEN_API_KEY=<your-key>
+./start.sh
+# open http://localhost:8080
+```
+
+Or via Docker (bootstraps the foundation at build time):
+
+```bash
+docker build -t barred .
+docker run -e BASETEN_API_KEY=<your-key> -p 8080:8080 barred
+```
+
+**No API key?** Every tri-state outcome is reproducible without one: the offline
+demo above, `cli.py review --offline`, and `cli.py eval` all run on the curated
+`evidence_pack/` (recorded model telemetry + deterministic re-validation), and
+`web/public/data` ships prebuilt recorded runs (regenerate offline with
+`python3 scripts/build_recorded_runs.py`).
+
 ---
 
 ## The Three Canonical Cases
