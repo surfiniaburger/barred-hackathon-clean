@@ -256,3 +256,7 @@ See [`RESULTS.md`](RESULTS.md) for the before/after comparison showing how the d
 - **Factorial Corpus**: [`evidence_pack/corpus_gateol_smoke_v10.jsonl`](evidence_pack/corpus_gateol_smoke_v10.jsonl)
 
 ---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
