@@ -18,6 +18,23 @@
 
 ---
 
+## Try it in 30 seconds (judges start here)
+
+No API key, no GPU, no model download, no install — plain `python3`:
+
+```bash
+git clone https://github.com/surfiniaburger/barred-hackathon-clean.git
+cd barred-hackathon-clean
+python3 cli.py demo --offline   # PASS / BLOCKED / UNRESOLVED on curated fixtures
+python3 cli.py eval             # confusion matrix on a recorded live batch
+```
+
+`demo` shows all three tri-state outcomes with deterministic re-validation;
+`eval` scores recorded model telemetry against the canonical ground-truth
+ledger (`0` false safety passes). Everything below — bootstrap, the live
+debate stack, Baseten/local inference — is the advanced path. Start here.
+
+---
 
 ## The Problem
 Every AI coding assistant today suffers from a fatal flaw: **it produces persuasive, authoritative-sounding explanations whether it is right or wrong.**
