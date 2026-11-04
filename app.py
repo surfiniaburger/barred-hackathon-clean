@@ -20,6 +20,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from barred_keys import fill_baseten_key
+
 ROOT = Path(__file__).resolve().parent
 FOUNDATION = ROOT / "foundation"
 
@@ -109,6 +111,9 @@ async def create_run(req: RunRequest) -> Dict[str, Any]:
     env.setdefault("JUDGE_MODEL", "openai/meta-models/muse-spark-open-1026")
     env.setdefault("OPENAI_API_BASE", "https://inference.baseten.co/v1")
     env.setdefault("OPENAI_API_KEY", os.getenv("BASETEN_API_KEY", ""))
+    # Runtime keychain fallback for Baseten runs only. Local endpoints
+    # (Mirai/Uzu with LLM_API_KEY=dummy) are never touched.
+    fill_baseten_key(env)
     env.setdefault("LLM_SAMPLING_PROFILE", "env")
     env.setdefault("LLM_MAX_TOKENS", "4096")
     env.setdefault("SEND_MESSAGE_TIMEOUT", "1800")

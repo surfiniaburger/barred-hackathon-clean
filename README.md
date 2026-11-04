@@ -33,6 +33,19 @@ The result is a clean tri-state security review:
 2. **`BLOCKED`**: Plausible model hallucination caught and rejected by AST gate.
 3. **`UNRESOLVED`**: Explicit epistemic refusal when outside the verified proof domain (no fake safety claims).
 
+### Who needs this
+
+AI coding assistants are increasingly pointed at legacy C/C++ codebases for
+security review and modernization — exactly where a convincing-but-wrong
+"safe" verdict is most dangerous. BARRED is for software engineers and
+security reviewers who need to independently verify the evidence behind an
+AI-proposed security fix before trusting it.
+
+The core design principle: the model's ability to *propose* a security
+argument is separated from the system's authority to *validate* it. The LLM
+selects among machine-extracted candidates; only the deterministic gate can
+certify one. No candidate the gate cannot verify ever becomes a `PASS`.
+
 ---
 
 ## Setup (Bootstrap)
@@ -65,21 +78,36 @@ uv run python cli.py demo --offline
 ### Live Mode (Debate Stack + Web UI)
 
 Live runs execute the full multi-agent debate against Meta models served via
-**Baseten** (a separate private product — set `BASETEN_API_KEY`). Requires the
-bootstrapped foundation:
+**Baseten** (a separate private product). The key is fetched from the OS
+keychain at runtime — store it once, then never export it again:
+
+```bash
+# one-time setup (macOS Keychain; no extra dependency; -U replaces a rotated key on rerun)
+security add-generic-password -U -s barred-baseten -a api_key -w
+# check what is configured (prints the source, never the key)
+python3 scripts/baseten_key.py --status
+```
+
+Requires the bootstrapped foundation:
 
 ```bash
 ./bootstrap.sh
-export BASETEN_API_KEY=<your-key>
 ./start.sh
 # open http://localhost:8080
 ```
 
-Or via Docker (bootstraps the foundation at build time):
+Explicit `BASETEN_API_KEY` still wins when set (CI, one-off keys), and local
+endpoints (`LLM_API_KEY=dummy`) never touch the keychain.
+
+Or via Docker (bootstraps the foundation at build time). The container cannot
+see the host keychain, so the wrapper resolves the key on the host and
+injects it — the key never appears in your shell history or in any repo
+file (standard `-e` caveat: it remains visible via `docker inspect` while
+the container exists):
 
 ```bash
 docker build -t barred .
-docker run -e BASETEN_API_KEY=<your-key> -p 8080:8080 barred
+./scripts/docker-run.sh
 ```
 
 Live runs also work against any OpenAI-compatible endpoint with no API key
@@ -188,6 +216,21 @@ demo above, `cli.py review --offline`, and `cli.py eval` all run on the curated
 | **Case 1 (safe_copy)** | `safe_copy`: upper-bound guard (`len >= cap`) protecting `memcpy(dst, src, len)` | Selects Candidate `C1` | **Confirmed**: 7/7 AST checks verify guard dominates sink | **`PASS`** |
 | **Case 2 (Seed 90 R1)** | `gdImageJpegPtr`: zero-width test on 3rd-party wrapper | Model refrains (`candidate_id: null`) | **Epistemic Bound**: AST domain refuses to certify unknown sinks | **`UNRESOLVED`** |
 | **Case 3 (Seed 90 R0)** | Superficial/ungrounded check before memory operation | Model attempts hallucination (`C1`) | **Blocked**: Gate rejects ungrounded candidate | **`BLOCKED`** |
+
+## Scope and limits
+
+BARRED certifies claims inside its supported proof domain: memory-safety
+invariants over recognized sinks (e.g. `memcpy`-family operations) with
+statically verifiable guard dominance and value relations. The terminal
+mapping is exact: a *selected* candidate that fails validation for any
+reason — failed checks, ungrounded anchors, an unrecognized sink, a
+malformed receipt — is rejected as `BLOCKED`. `UNRESOLVED` is abstention,
+not rejection: no candidate was put forward for certification (the model
+refrained) or the seed omits the decisive evidence (context-deficient), so
+there is nothing to certify and nothing to reject. BARRED does not establish
+universal software safety. An `UNRESOLVED` result is the system working as
+designed: it tells you when its proof does not apply rather than
+manufacturing certainty.
 
 ---
 

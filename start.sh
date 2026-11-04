@@ -10,6 +10,12 @@ cd "$ROOT_DIR"
 export LLM_MODEL="${LLM_MODEL:-openai/meta-models/muse-spark-open-1026}"
 export LLM_API_BASE="${LLM_API_BASE:-https://inference.baseten.co/v1}"
 export LLM_API_KEY="${LLM_API_KEY:-${BASETEN_API_KEY:-}}"
+# Fetch the Baseten key from the OS keychain at runtime when it was not
+# passed explicitly (Baseten runs only; local endpoints untouched).
+# Guarded: a partial checkout without the snippet must not abort startup.
+if [ -f "$ROOT_DIR/scripts/baseten_key_env.sh" ]; then
+    . "$ROOT_DIR/scripts/baseten_key_env.sh"
+fi
 export DEBATER_MODEL="$LLM_MODEL"
 export VERIFIER_MODEL="$LLM_MODEL"
 export GENERATOR_MODEL="$LLM_MODEL"

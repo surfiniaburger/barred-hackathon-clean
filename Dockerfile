@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 ENV PYTHONPATH=/app/foundation
 ENV PORT=8080
+# Injected at run time from the host OS keychain via scripts/docker-run.sh
+# (explicit -e BASETEN_API_KEY=... also works). Never baked into the image.
 ENV BASETEN_API_KEY=""
 
 EXPOSE 8080
